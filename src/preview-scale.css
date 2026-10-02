@@ -1,0 +1,76 @@
+/* Compact on-screen preview; print media keeps the original A4 layout. */
+@media screen {
+  .cokifimi-preview-modal {
+    background: transparent !important;
+    inset: auto !important;
+    max-width: 1080px !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    position: static !important;
+    z-index: auto !important;
+  }
+
+  #declaration-preview-container > #print-sheet-wrapper {
+    padding: 18px 18px 22px !important;
+  }
+
+  #declaration-preview-container .print-only-page {
+    padding: 12px 14px 18px !important;
+    box-shadow: 0 8px 18px rgb(15 90 62 / .08) !important;
+  }
+
+  #declaration-preview-container .print-only-page .fields-grid > div > div {
+    color: #111827 !important;
+  }
+
+  #declaration-preview-container .cokifimi-print-title {
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+    letter-spacing: .04em !important;
+    margin: 0 auto 10px !important;
+    max-width: 680px !important;
+  }
+
+  #declaration-preview-container .cokifimi-declaration-text,
+  #declaration-preview-container .cokifimi-legal-block {
+    font-size: 16px !important;
+    line-height: 1.45 !important;
+    margin-bottom: 10px !important;
+  }
+
+  #declaration-preview-container .fields-grid > div {
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+    min-height: 0 !important;
+  }
+
+  #declaration-preview-container #print-page-1 > div:first-child img,
+  #declaration-preview-container #print-page-2 > div:first-child img {
+    width: 80px !important;
+    height: 80px !important;
+  }
+
+  #declaration-preview-container #print-page-1 > div:first-child > div,
+  #declaration-preview-container #print-page-2 > div:first-child > div,
+  #declaration-preview-container #print-page-1 > div:first-child > div > div,
+  #declaration-preview-container #print-page-2 > div:first-child > div > div {
+    font-size: 16px !important;
+    line-height: 1.25 !important;
+  }
+
+  #declaration-preview-container .fields-grid > div > div {
+    font-size: 18px !important;
+    line-height: 1.35 !important;
+  }
+}
+
+@media print {
+  .print-only-page .fields-grid > div > div {
+    color: #111827 !important;
+    font-size: 18px !important;
+    line-height: 1.35 !important;
+  }
+  .print-only-page .font-mono {
+    color: #374151 !important;
+  }
+}

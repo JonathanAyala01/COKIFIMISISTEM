@@ -1,0 +1,6 @@
+{
+  "name": "CoKiFiMi - Declaraciones Juradas",
+  "description": "Sistema de actualización de datos personales y profesionales en línea para el Colegio de Kinesiólogos y Fisioterapeutas de Misiones, con exportación de declaración jurada digital lista para firmar.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["J.A"]
+}

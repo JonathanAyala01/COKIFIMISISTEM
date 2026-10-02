@@ -1,0 +1,518 @@
+/* Declaration preview: plugin-owned layout, isolated from WordPress themes. */
+#declaration-preview-container {
+  color: #111827 !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+  max-width: 1080px !important;
+  margin: 0 auto !important;
+}
+
+#declaration-preview-container > .print\:hidden {
+  background: linear-gradient(135deg, #064e3b, #0f6b49) !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  color: #fff !important;
+  padding: 22px 26px !important;
+}
+
+#declaration-preview-container > .print\:hidden h2 {
+  color: #fff !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+  font-size: 24px !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  margin: 8px 0 !important;
+}
+
+#declaration-preview-container > .print\:hidden button {
+  align-items: center !important;
+  background: rgba(255,255,255,.14) !important;
+  border: 1px solid rgba(255,255,255,.35) !important;
+  border-radius: 9999px !important;
+  color: #fff !important;
+  display: inline-flex !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  gap: 7px !important;
+  min-height: 42px !important;
+  padding: 0 18px !important;
+}
+
+#declaration-preview-container > .print\:hidden button:hover {
+  background: rgba(255,255,255,.24) !important;
+  color: #fff !important;
+}
+
+#declaration-preview-container > .print\:hidden button:last-child {
+  background: #fff !important;
+  border-color: #fff !important;
+  color: #0f5a3e !important;
+}
+
+#declaration-preview-container > .print\:hidden p,
+#declaration-preview-container > .print\:hidden span {
+  font-family: Arial, Helvetica, sans-serif !important;
+}
+
+#declaration-preview-container #print-sheet-wrapper {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 28px !important;
+  margin-top: 28px !important;
+}
+
+#declaration-preview-container .print-only-page {
+  background: #fff !important;
+  border: 1px solid #d8e2dd !important;
+  border-radius: 24px !important;
+  box-sizing: border-box !important;
+  color: #111827 !important;
+  height: 1131px !important;
+  max-width: 800px !important;
+  min-height: 1131px !important;
+  padding: 28px 34px !important;
+  width: 100% !important;
+}
+
+#declaration-preview-container .print-only-page *,
+#declaration-preview-container .fields-grid * {
+  color: #111827 !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+  text-shadow: none !important;
+}
+
+#declaration-preview-container .print-only-page > div:first-child > div {
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+}
+
+#declaration-preview-container .print-only-page > div:first-child img {
+  height: 88px !important;
+  width: 88px !important;
+}
+
+#declaration-preview-container .cokifimi-print-title {
+  border-bottom: 1px solid #d8e2dd !important;
+  color: #111827 !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  letter-spacing: .02em !important;
+  line-height: 1.2 !important;
+  margin: 14px auto 22px !important;
+  padding-bottom: 10px !important;
+  text-align: center !important;
+}
+
+#declaration-preview-container .fields-grid > div {
+  padding: 3px 0 !important;
+}
+
+#declaration-preview-container .fields-grid > div > div {
+  color: #111827 !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+}
+
+#declaration-preview-container .fields-grid > div > div:first-child {
+  color: #374151 !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+}
+
+#declaration-preview-container .declaration-expiry-field > div,
+#declaration-preview-container .declaration-expiry-field > div:first-child {
+  color: #dc2626 !important;
+  font-weight: 800 !important;
+}
+#declaration-preview-container .declaration-expiry-field span {
+  color: #dc2626 !important;
+  font-weight: 800 !important;
+}
+
+@media print {
+  #declaration-preview-container .print-only-page {
+    border: 0 !important;
+    border-radius: 0 !important;
+    height: 297mm !important;
+    max-width: none !important;
+    min-height: 297mm !important;
+    padding: 10mm 14mm 14mm !important;
+    width: 210mm !important;
+  }
+  #declaration-preview-container .cokifimi-print-title {
+    font-size: 13px !important;
+    margin: 3mm auto 5mm !important;
+  }
+  #declaration-preview-container .fields-grid > div > div {
+    font-size: 8.5px !important;
+  }
+  #declaration-preview-container .declaration-expiry-field > div,
+  #declaration-preview-container .declaration-expiry-field > div:first-child {
+    color: #dc2626 !important;
+    font-weight: 800 !important;
+  }
+}
+
+/* Final plugin preview composition: header and first sheet are one surface. */
+@media screen {
+  #declaration-preview-container #print-sheet-wrapper {
+    gap: 0 !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  #declaration-preview-container #print-sheet-wrapper > .print-only-page:first-child {
+    margin-top: 0 !important;
+  }
+
+  #declaration-preview-container #print-page-1 p.cokifimi-page1-legal {
+    font-size: 8px !important;
+    line-height: 1.2 !important;
+    letter-spacing: 0 !important;
+    margin: 0 auto 10px !important;
+    max-width: 640px !important;
+  }
+}
+
+@media print {
+  #declaration-preview-container #print-page-1 p.cokifimi-page1-legal,
+  .print-document #print-page-1 p.cokifimi-page1-legal {
+    font-size: 8px !important;
+    line-height: 1.2 !important;
+    margin-bottom: 3mm !important;
+  }
+}
+/* Compact typography and spacing for the declaration sheet preview. */
+@media screen {
+  #declaration-preview-container #print-page-1 > div:first-child img,
+  #declaration-preview-container #print-page-2 > div:first-child img {
+    height: 80px !important;
+    width: 80px !important;
+  }
+
+  #declaration-preview-container #print-page-1 > div:first-child > div,
+  #declaration-preview-container #print-page-2 > div:first-child > div,
+  #declaration-preview-container #print-page-1 > div:first-child > div > div,
+  #declaration-preview-container #print-page-2 > div:first-child > div > div {
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 9px !important;
+    line-height: 1.1 !important;
+  }
+
+  #declaration-preview-container .cokifimi-print-title {
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 13px !important;
+    line-height: 1.15 !important;
+    letter-spacing: .02em !important;
+    margin: 0 auto 5px !important;
+    padding-bottom: 4px !important;
+  }
+
+  #declaration-preview-container .cokifimi-print-subtitle {
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 9px !important;
+    line-height: 1.2 !important;
+    margin: 0 auto 8px !important;
+  }
+
+  #declaration-preview-container .fields-grid > div {
+    padding: 2px 0 !important;
+    min-height: 0 !important;
+  }
+
+  #declaration-preview-container .fields-grid > div > div {
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 9px !important;
+    line-height: 1.15 !important;
+  }
+
+  #declaration-preview-container .fields-grid > div > div:first-child {
+    font-size: 8px !important;
+    line-height: 1.15 !important;
+  }
+}
+/* Compact legal section on page two, matching the original plugin sheet. */
+@media screen {
+  #declaration-preview-container #print-page-2 .cokifimi-legal-block,
+  #declaration-preview-container #print-page-2 .cokifimi-legal-block .cokifimi-declaration-text {
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 8px !important;
+    line-height: 1.2 !important;
+    margin-bottom: 8px !important;
+  }
+
+  #declaration-preview-container #print-page-2 .cokifimi-legal-block > div {
+    font-size: 8px !important;
+    line-height: 1.2 !important;
+    margin-bottom: 4px !important;
+  }
+}
+
+@media print {
+  #declaration-preview-container #print-page-2 .cokifimi-legal-block,
+  #declaration-preview-container #print-page-2 .cokifimi-legal-block .cokifimi-declaration-text,
+  .print-document #print-page-2 .cokifimi-legal-block {
+    font-size: 8px !important;
+    line-height: 1.2 !important;
+    margin-bottom: 4mm !important;
+  }
+}
+/* Slightly larger page-one legal text for readability. */
+@media screen {
+  #declaration-preview-container #print-page-1 p.cokifimi-page1-legal {
+    font-size: 9px !important;
+    line-height: 1.25 !important;
+  }
+}
+@media print {
+  #declaration-preview-container #print-page-1 p.cokifimi-page1-legal,
+  .print-document #print-page-1 p.cokifimi-page1-legal {
+    font-size: 9px !important;
+    line-height: 1.25 !important;
+  }
+}
+/* Increase page-two legal text slightly for readability. */
+@media screen {
+  #declaration-preview-container #print-page-2 .cokifimi-legal-block,
+  #declaration-preview-container #print-page-2 .cokifimi-legal-block .cokifimi-declaration-text,
+  #declaration-preview-container #print-page-2 .cokifimi-legal-block > div {
+    font-size: 9px !important;
+    line-height: 1.25 !important;
+  }
+}
+@media print {
+  #declaration-preview-container #print-page-2 .cokifimi-legal-block,
+  #declaration-preview-container #print-page-2 .cokifimi-legal-block .cokifimi-declaration-text,
+  .print-document #print-page-2 .cokifimi-legal-block {
+    font-size: 9px !important;
+    line-height: 1.25 !important;
+  }
+}
+/* Slightly larger declaration field information for readability. */
+@media screen {
+  #declaration-preview-container .fields-grid > div > div {
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+  }
+  #declaration-preview-container .fields-grid > div > div:first-child {
+    font-size: 9px !important;
+  }
+}
+@media print {
+  #declaration-preview-container .fields-grid > div > div,
+  .print-document .fields-grid > div > div {
+    font-size: 9.5px !important;
+    line-height: 1.2 !important;
+  }
+}
+/* Formulario 1: la consulta del colegiado debe usar exactamente la misma
+   composición visual que la vista de Colegiado en Administración. */
+#declaration-preview-container.cokifimi-declaration-preview {
+  box-sizing: border-box !important;
+  display: block !important;
+  margin: 0 auto !important;
+  max-width: 1120px !important;
+  padding: 0 !important;
+  width: 100% !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child {
+  align-items: center !important;
+  border-radius: 20px 20px 0 0 !important;
+  box-sizing: border-box !important;
+  gap: 24px !important;
+  margin: 0 !important;
+  min-height: 150px !important;
+  padding: 28px 32px !important;
+  position: relative !important;
+  width: 100% !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child h2 {
+  color: #fff !important;
+  font-size: clamp(1.35rem, 2.3vw, 2.15rem) !important;
+  font-weight: 850 !important;
+  letter-spacing: -.025em !important;
+  line-height: 1.08 !important;
+  margin: 0 !important;
+  max-width: 780px !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child > div:last-child {
+  align-items: stretch !important;
+  flex: 0 0 auto !important;
+  gap: 10px !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview > #print-sheet-wrapper {
+  background: #fff !important;
+  border: 1px solid #d7e8df !important;
+  border-radius: 0 0 20px 20px !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview > #print-sheet-wrapper > .print-only-page {
+  border-radius: 14px !important;
+  box-shadow: 0 8px 24px rgb(15 90 62 / .08) !important;
+}
+@media (max-width: 760px) {
+  #declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    padding: 22px 18px !important;
+  }
+  #declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child > div:last-child {
+    justify-content: flex-start !important;
+    width: 100% !important;
+  }
+  #declaration-preview-container.cokifimi-declaration-preview > #print-sheet-wrapper {
+    padding: 0 !important;
+  }
+}
+/* Cabecera única del Formulario 1 para Administración y portal del colegiado. */
+#declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child {
+  align-items: flex-start !important;
+  border-radius: 18px !important;
+  gap: 24px !important;
+  min-height: 168px !important;
+  padding: 34px 26px !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child > div:first-child {
+  align-items: flex-start !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child h2 {
+  font-size: 24px !important;
+  line-height: 1.12 !important;
+  margin: 0 !important;
+  max-width: 780px !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child p {
+  font-size: 16px !important;
+  line-height: 1.35 !important;
+  margin-top: 8px !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child > div:last-child {
+  align-items: stretch !important;
+  flex: 0 0 157px !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  padding-top: 1px !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child button {
+  border-radius: 999px !important;
+  box-sizing: border-box !important;
+  justify-content: center !important;
+  min-height: 42px !important;
+  padding: 0 16px !important;
+  width: 157px !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child button:last-child {
+  background: #fff !important;
+  color: #075c43 !important;
+}
+@media (max-width: 760px) {
+  #declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child {
+    min-height: 0 !important;
+    padding: 24px 18px !important;
+  }
+  #declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child > div:last-child {
+    flex: 0 0 auto !important;
+    padding-top: 0 !important;
+    width: 100% !important;
+  }
+  #declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child button {
+    width: 100% !important;
+  }
+}#declaration-preview-container.cokifimi-declaration-preview > .print\:hidden:first-child > div:last-child > button:nth-child(2):not(:last-child) {
+  display: none !important;
+}
+/* El título y subtítulo del Formulario 1 forman un único bloque, sin divisor. */
+#declaration-preview-container.cokifimi-declaration-preview .cokifimi-print-title {
+  border-bottom: 0 !important;
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview .cokifimi-print-subtitle {
+  margin-top: 0 !important;
+  margin-bottom: 8px !important;
+}
+/* Ajuste fino: título y subtítulo quedan unidos también en Administración. */
+#declaration-preview-container.cokifimi-declaration-preview .cokifimi-print-title {
+  line-height: 1.1 !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview .cokifimi-print-subtitle {
+  margin-top: -4px !important;
+}
+/* Separación visual breve entre título y subtítulo, sin línea divisoria. */
+#declaration-preview-container.cokifimi-declaration-preview .cokifimi-print-title {
+  margin-bottom: 4px !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview .cokifimi-print-subtitle {
+  margin-top: 0 !important;
+}
+/* Campos del Formulario 1: separación compacta y uniforme entre filas. */
+#declaration-preview-container.cokifimi-declaration-preview .fields-grid > div {
+  padding-bottom: 1px !important;
+  padding-top: 1px !important;
+}
+#declaration-preview-container.cokifimi-declaration-preview .fields-grid > div > div {
+  line-height: 1.1 !important;
+}
+/* ==========================================================================
+   Formulario 1 bianual — tamaño único del texto de información.
+   Vale para Administración y Colegiado (misma vista) y para la impresión.
+   Estas reglas van al final del último CSS importado: son las autoritativas.
+   ========================================================================== */
+#declaration-preview-container .fields-grid > div > div,
+#declaration-preview-container.cokifimi-declaration-preview .fields-grid > div > div,
+.print-document .fields-grid > div > div,
+body.cokifimi-dj-active .cokifimi-app .fields-grid > div > div {
+  font-size: 14px !important;
+  line-height: 1.3 !important;
+}
+
+#declaration-preview-container .fields-grid > div > div:first-child,
+#declaration-preview-container.cokifimi-declaration-preview .fields-grid > div > div:first-child,
+.print-document .fields-grid > div > div:first-child,
+body.cokifimi-dj-active .cokifimi-app .fields-grid > div > div:first-child {
+  /* Mismo cuerpo que el valor: etiqueta e info alineadas y del mismo tamaño. */
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1.3 !important;
+}
+
+@media print {
+  #declaration-preview-container .fields-grid > div > div,
+  #declaration-preview-container.cokifimi-declaration-preview .fields-grid > div > div,
+  .print-document .fields-grid > div > div,
+  body.cokifimi-dj-active .cokifimi-app #print-page-1 .fields-grid > div > div,
+  body.cokifimi-dj-active .cokifimi-app #print-page-2 .fields-grid > div > div {
+    font-size: 14px !important;
+    line-height: 1.3 !important;
+  }
+  #declaration-preview-container .fields-grid > div > div:first-child,
+  #declaration-preview-container.cokifimi-declaration-preview .fields-grid > div > div:first-child,
+  .print-document .fields-grid > div > div:first-child,
+  body.cokifimi-dj-active .cokifimi-app #print-page-1 .fields-grid > div > div:first-child,
+  body.cokifimi-dj-active .cokifimi-app #print-page-2 .fields-grid > div > div:first-child {
+    font-size: 14px !important;
+    line-height: 1.3 !important;
+  }
+}
+
+/* El bloque legal/declaración acompaña el mismo cuerpo de texto. */
+#declaration-preview-container .cokifimi-declaration-text,
+#declaration-preview-container .cokifimi-legal-block,
+#declaration-preview-container #print-page-1 p.cokifimi-page1-legal {
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+}
+
+/* Etiqueta y valor sobre la misma línea base, en pantalla y en impresión. */
+#declaration-preview-container .fields-grid > div,
+#declaration-preview-container.cokifimi-declaration-preview .fields-grid > div,
+.print-document .fields-grid > div,
+body.cokifimi-dj-active .cokifimi-app .fields-grid > div {
+  align-items: baseline !important;
+}
