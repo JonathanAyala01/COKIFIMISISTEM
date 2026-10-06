@@ -559,7 +559,7 @@ export default function FormWizard({ initialData, onSave, onReview, onCancel, re
     add(data.polizaPraxisArchivo, "Archivo obligatorio del seguro de mala praxis médica", 5);
     if (String(data.seguroHasta || "") <= currentDateString()) missing.push({ label: "La vigencia de la póliza debe ser posterior a la fecha actual", step: 4 });
     if (String(data.seguroDesde || "") && String(data.seguroHasta || "") && String(data.seguroDesde) >= String(data.seguroHasta)) missing.push({ label: "La fecha hasta debe ser posterior a la fecha desde", step: 4 });
-    if (data.trabajaConsultorio === 'SI') {
+    if (data.trabajaConsultorio !== 'NO') {
       add(data.atiendeObrasSociales, 'Atiende por medio de obras sociales', 4);
       if (data.atiendeObrasSociales === 'SI') {
         add(data.anssalDesde, 'ANSSAL desde', 4);
@@ -1579,8 +1579,10 @@ export default function FormWizard({ initialData, onSave, onReview, onCancel, re
                 </select>
               </div>
 
-              {formData.trabajaConsultorio === 'SI' && (
+              {formData.trabajaConsultorio !== 'NO' && (
                 <>
+                  {formData.trabajaConsultorio === 'SI' && (
+                    <>
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-[#0F5A3E] uppercase tracking-wider mb-1.5" htmlFor="cantidadConsultorios">Cantidad de consultorios *</label>
                     <select id="cantidadConsultorios" required value={formData.cantidadConsultorios || 1} onChange={e => updateCantidadConsultorios(Number(e.target.value) as 1 | 2 | 3 | 4)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0F5A3E] focus:border-[#0F5A3E] font-medium">
@@ -1681,7 +1683,9 @@ export default function FormWizard({ initialData, onSave, onReview, onCancel, re
                     );
                   })}
 
-                  {formData.trabajaConsultorio === 'SI' && (
+                  </>
+                  )}
+                  {formData.trabajaConsultorio !== 'NO' && (
                     <div className="md:col-span-2 mt-4 rounded-xl border border-[#B7DCCB] bg-[#F8FFFB] p-4 md:p-5 shadow-sm">
                       <div className="mb-4">
                         <h5 className="text-base font-bold text-[#0F5A3E]">{adjuntoFlag ? "Informe sus datos como profesional" : "Datos profesionales"}</h5>
@@ -1759,7 +1763,7 @@ export default function FormWizard({ initialData, onSave, onReview, onCancel, re
                   </div>
                 </>
               )}
-              {formData.trabajaConsultorio !== 'SI' && (
+              {formData.trabajaConsultorio === 'NO' && (
                 <div className="md:col-span-2 mt-4 rounded-xl border border-[#B7DCCB] bg-[#F8FFFB] p-4 md:p-5 shadow-sm"><h5 className="mb-4 text-base font-bold text-[#0F5A3E]">Seguro de mala praxis médica obligatorio</h5><div className="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2"><div className="md:col-span-2"><label className="block text-xs font-bold uppercase tracking-wider text-gray-700">Nombre de la compañía del seguro de praxis médica</label><input type="text" required value={formData.companiaSeguro || ""} onChange={e => updateField("companiaSeguro", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900" /></div><div><label className="block text-xs font-bold uppercase tracking-wider text-gray-700">Número de la póliza de praxis médica</label><input type="text" required value={formData.polizaSeguro || ""} onChange={e => updateField("polizaSeguro", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900" /></div><div><label className="block text-xs font-bold uppercase tracking-wider text-gray-700">Vigencia de la póliza desde</label><input type="date" required value={formData.seguroDesde || ""} onChange={e => updateField("seguroDesde", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900" /></div><div><label className="block text-xs font-bold uppercase tracking-wider text-gray-700">Vigencia de la póliza hasta</label><input type="date" required value={formData.seguroHasta || ""} onChange={e => updateField("seguroHasta", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900" /></div></div></div>
               )}
             </div>
@@ -1767,7 +1771,7 @@ export default function FormWizard({ initialData, onSave, onReview, onCancel, re
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 shadow-sm">
                 <h4 className="text-sm font-bold text-[#0F5A3E] mb-4">{adjuntoFlag ? "Documentación obligatoria como profesional adjunto" : "Certificado de mala praxis obligatorio"}</h4>
                 <div className={`grid grid-cols-1 gap-4 ${adjuntoFlag ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
-                  {formData.trabajaConsultorio === "SI" && formData.atiendeObrasSociales === "SI" && (
+                  {formData.trabajaConsultorio !== "NO" && formData.atiendeObrasSociales === "SI" && (
                   <div className="rounded-xl border border-emerald-200 bg-white p-4">
                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">Certificado ANSSAL vigente</label>
                     <p className="mb-3 text-xs font-bold text-red-600">Solo se puede subir archivo en formato PDF.</p>
