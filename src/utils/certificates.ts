@@ -14,7 +14,7 @@ const institutional = {
   location: 'de Misiones',
   legal: 'Ley I N\u00b0 55 \u00b7 Personer\u00eda Jur\u00eddica N\u00b0 894',
   address: 'Ram\u00f3n Garc\u00eda N\u00b0 942 (ex.134) \u00b7 Posadas \u2013 Misiones',
-  contact: 'Tel: 03764421795 \u00b7 colegiokinesiologosmisiones@gmail.com',
+  contact: 'Tel: 03764421795 \u00b7 colegioklgosmisiones@gmail.com',
 };
 
 function baseDocument(title: string, subtitle: string) {
@@ -79,7 +79,7 @@ export function generateAutomaticCertificates(data: DeclarationData, options?: {
     .map((value) => String(value || '').trim())
     .filter(Boolean)
     .join(' ') || 'el domicilio declarado';
-  const attachedProfessionals = ['', ...Array.from({ length: 7 }, (_, index) => String(index + 2))]
+  const attachedProfessionals = ['', ...Array.from({ length: 12 }, (_, index) => String(index + 2))]
     .map((suffix) => ({
       titulo: String(form[`adjuntoTitulo${suffix}`] || '').trim(),
       apellido: String(form[`adjuntoApellido${suffix}`] || '').trim(),

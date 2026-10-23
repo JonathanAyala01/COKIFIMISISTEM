@@ -26,14 +26,17 @@ import {
   History,
   BellRing,
   Send,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { DeclarationData } from '../types';
 import { MISIONES_LOCALITY_POSTAL_BY_NAME, normalizeMisionesLocality } from '../data/misionesLocalities';
 import { deleteMemberAccount, loadServerRecordPhoto, syncLegacyMemberAccount } from '../api';
 import ConsultorioRequestsPanel from './ConsultorioRequestsPanel';
 import ConsultorioRequestMetrics from './ConsultorioRequestMetrics';
+import ConsultorioRosterModal from './ConsultorioRosterModal';
 import LibreDeudaPanel from './LibreDeudaPanel';
 import RecordPhoto from './RecordPhoto';
+import { downloadBianualExcel } from '../utils/bianualExcel';
 
 const localDateOnly = (value: string) => {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -51,6 +54,8 @@ const getBianualAlertHistory = (declaration: DeclarationData) => {
   }
   return history;
 };
+const normalizeSearchText = (value: unknown) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const normalizeMatriculaSearch = (value: unknown) => String(value ?? '').replace(/\\D/g, '');
 const cardExpiryDate = (declaration: DeclarationData) => {
   const expiry = declaration.fechaVencimiento ? localDateOnly(declaration.fechaVencimiento) : null;
   const presentation = declaration.fechaPresentacion ? localDateOnly(declaration.fechaPresentacion) : null;
@@ -96,13 +101,16 @@ export default function DeclarationDashboard({
   const [declarationToDelete, setDeclarationToDelete] = useState<DeclarationData | null>(null);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [photoRecord, setPhotoRecord] = useState<DeclarationData | null>(null);
-  const [postalCodeFilter, setPostalCodeFilter] = useState('');
   const [showMemberAccessModal, setShowMemberAccessModal] = useState(false);
+  const [showBianualExcelModal, setShowBianualExcelModal] = useState(false);
+  const [bianualExcelSearch, setBianualExcelSearch] = useState('');
+  const [selectedBianualExcelIds, setSelectedBianualExcelIds] = useState<string[]>([]);
   const [memberAccessSearch, setMemberAccessSearch] = useState('');
   const [syncingLegacyAccount, setSyncingLegacyAccount] = useState(false);
   const [deletingMemberAccount, setDeletingMemberAccount] = useState('');
   const [showConsultorioRequests, setShowConsultorioRequests] = useState(false);
   const [showLibreDeuda, setShowLibreDeuda] = useState(false);
+  const [showConsultorioRoster, setShowConsultorioRoster] = useState(false);
   const [bianualAlertTarget, setBianualAlertTarget] = useState<DeclarationData | null>(null);
   const [bianualAlertDraft, setBianualAlertDraft] = useState('');
   const [savingBianualAlert, setSavingBianualAlert] = useState(false);
@@ -252,20 +260,17 @@ export default function DeclarationDashboard({
   // Filter declarations based on search
   const submittedDeclarations = declarations.filter(dec => !dec.memberProvisional);
   const filtered = submittedDeclarations.filter(dec => {
-    const query = searchTerm.toLowerCase();
-    const matchesSearch = (
-      dec.apellido.toLowerCase().includes(query) ||
-      dec.nombres.toLowerCase().includes(query) ||
-      dec.matricula.includes(query) ||
-      dec.dni.includes(query) ||
-      dec.ciudadNacimiento.toLowerCase().includes(query) ||
-      getConsultorioPostalCode(dec).toLowerCase().includes(query) ||
-      getConsultorios(dec).some(consultorio => consultorio.ciudad.toLowerCase().includes(query))
-    );
-    const matchesPostalCode = !postalCodeFilter.trim() ||
-      getConsultorioPostalCode(dec).includes(postalCodeFilter.trim()) ||
-      getConsultorios(dec).some(consultorio => getConsultorioPostalCode(dec, consultorio.ciudad).includes(postalCodeFilter.trim()));
-    return matchesSearch && matchesPostalCode && (!showExpiredOnly || isExpired(dec));
+    const rawQuery = searchTerm.trim();
+    if (!rawQuery) return !showExpiredOnly || isExpired(dec);
+    const matriculaQuery = normalizeMatriculaSearch(rawQuery);
+    const isMatriculaSearch = /^[0-9 .\\/-]+$/.test(rawQuery) && matriculaQuery.length > 0;
+    const matchesMatricula = isMatriculaSearch
+      ? normalizeMatriculaSearch(dec.matricula) === matriculaQuery
+      : false;
+    const nameTerms = normalizeSearchText(rawQuery).split(/\s+/).filter(Boolean);
+    const fullName = normalizeSearchText(`${dec.apellido} ${dec.nombres}`);
+    const matchesName = nameTerms.length > 0 && nameTerms.every(term => fullName.includes(term));
+    return (matchesMatricula || matchesName) && (!showExpiredOnly || isExpired(dec));
   });
   const listSortedByMatricula = [...filtered].sort((a, b) => {
     const matriculaA = Number.parseInt(a.matricula.replace(/\D/g, ''), 10);
@@ -274,6 +279,27 @@ export default function DeclarationDashboard({
     const valueB = Number.isNaN(matriculaB) ? -1 : matriculaB;
     return valueB - valueA || b.matricula.localeCompare(a.matricula, 'es', { numeric: true });
   });
+  const bianualExcelCandidates = [...submittedDeclarations].sort((a, b) => a.matricula.localeCompare(b.matricula, 'es', { numeric: true }));
+  const bianualExcelFiltered = bianualExcelCandidates.filter((dec) => {
+    const query = normalizeSearchText(bianualExcelSearch);
+    if (!query) return true;
+    const digits = query.replace(/\D/g, '');
+    return normalizeSearchText(`${dec.apellido} ${dec.nombres} ${dec.email}`).includes(query)
+      || (digits.length > 0 && `${dec.matricula} ${dec.dni}`.replace(/\D/g, '').includes(digits));
+  });
+  const selectedBianualExcelSet = new Set(selectedBianualExcelIds);
+  const areAllBianualExcelFilteredSelected = bianualExcelFiltered.length > 0 && bianualExcelFiltered.every((dec) => selectedBianualExcelSet.has(dec.id));
+  const toggleBianualExcelSelection = (id: string) => setSelectedBianualExcelIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  const toggleAllBianualExcelFiltered = () => setSelectedBianualExcelIds((current) => {
+    const shown = new Set(bianualExcelFiltered.map((dec) => dec.id));
+    return areAllBianualExcelFilteredSelected ? current.filter((id) => !shown.has(id)) : [...new Set([...current, ...shown])];
+  });
+  const exportSelectedBianualExcel = () => {
+    const selected = bianualExcelCandidates.filter((dec) => selectedBianualExcelSet.has(dec.id));
+    if (!selected.length) return;
+    downloadBianualExcel(selected);
+    setShowBianualExcelModal(false);
+  };
 
   // Calculate some analytics
   const total = submittedDeclarations.length;
@@ -346,6 +372,7 @@ export default function DeclarationDashboard({
     return 'Consulta de condición';
   };
   if (showLibreDeuda) return <div className='cokifimi-consultorio-dashboard-shell'><LibreDeudaPanel declarations={declarations} onUpdate={onUpdateConsultorioValidation} onClose={() => setShowLibreDeuda(false)} /></div>;
+  if (showConsultorioRoster) return <ConsultorioRosterModal declarations={declarations} onClose={() => setShowConsultorioRoster(false)} />;
   if (showConsultorioRequests) return <div className="cokifimi-consultorio-dashboard-shell">{!consultorioEditing && <div className="cokifimi-consultorio-pricing-slot">{pricingPanel}</div>}<ConsultorioRequestsPanel declarations={declarations} initialRequestId={initialConsultorioRequestId} onUpdate={onUpdateConsultorioValidation} onDelete={onDeleteConsultorio} onDeleteAll={onDeleteAllConsultorios} onEditingChange={setConsultorioEditing} onClose={() => { setInitialConsultorioRequestId(null); setShowConsultorioRequests(false); setConsultorioEditing(false); }} />{!consultorioEditing && <ConsultorioRequestMetrics declarations={declarations} />}</div>;
   return (
     <div className="space-y-6" id="dashboard-container">
@@ -461,27 +488,18 @@ export default function DeclarationDashboard({
           <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Buscar por Apellido, Nombre, Matrícula o DNI..."
+            placeholder="Buscar por matrícula o nombre y apellido..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
           />
         </div>
-        <input
-          type="search"
-          inputMode="numeric"
-          maxLength={10}
-          placeholder="Filtra por código postal"
-          value={postalCodeFilter}
-          onChange={e => setPostalCodeFilter(e.target.value.replace(/\D/g, ''))}
-          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-xs text-gray-900 shadow-sm focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 md:max-w-[210px]"
-          aria-label="Filtrar consultorios por código postal"
-        />
         </div>
         <div className="cokifimi-dashboard-toolbar-actions flex items-center gap-3">
           <p className="text-xs text-gray-500 font-medium">Mostrando {filtered.length} de {total} declaraciones</p>
+          <button type="button" onClick={() => { setBianualExcelSearch(''); setSelectedBianualExcelIds([]); setShowBianualExcelModal(true); }} className="cokifimi-excel-export-trigger" title="Exportar fichas bianuales a Excel" aria-label="Exportar fichas bianuales a Excel"><FileSpreadsheet aria-hidden="true" /></button>
           <button type="button" onClick={() => setShowMemberAccessModal(true)} className="cokifimi-dashboard-access-button" title="Administrar accesos de colegiados"><ShieldCheck className="h-4 w-4" /> Accesos</button>
-          <button type="button" onClick={() => { setConsultorioEditing(false); setShowConsultorioRequests(true); }} className="cokifimi-consultorio-requests-launcher" title="Gestionar altas de consultorio"><Calculator /> <span>Altas de consultorio</span></button><button type="button" onClick={() => setShowLibreDeuda(true)} className="cokifimi-libre-deuda-launcher" title="Gestionar Libre Deuda"><ShieldCheck /> <span>Libre Deuda</span></button>
+          <button type="button" onClick={() => { setConsultorioEditing(false); setShowConsultorioRequests(true); }} className="cokifimi-consultorio-requests-launcher" title="Gestionar altas de consultorio"><Calculator /> <span>Altas de consultorio</span></button><button type="button" onClick={() => setShowLibreDeuda(true)} className="cokifimi-libre-deuda-launcher" title="Gestionar Libre Deuda"><ShieldCheck /> <span>Libre Deuda</span></button><button type="button" onClick={() => setShowConsultorioRoster(true)} className="cokifimi-libre-deuda-launcher" title="Lista de colegiados con altas"><Download /> <span>Lista de altas</span></button>
           <div className="cokifimi-view-toggle flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
             <button type="button" onClick={() => setViewMode('cards')} className={`cokifimi-view-toggle-button p-1.5 rounded ${viewMode === 'cards' ? 'is-active' : ''}`} title="Vista tarjetas"><LayoutGrid className="w-4 h-4" /></button>
             <button type="button" onClick={() => setViewMode('table')} className={`cokifimi-view-toggle-button p-1.5 rounded ${viewMode === 'table' ? 'is-active' : ''}`} title="Vista planilla"><List className="w-4 h-4" /></button>
@@ -733,6 +751,17 @@ export default function DeclarationDashboard({
           <div className="cokifimi-access-table-wrap overflow-auto p-4"><div className="min-w-[760px] overflow-hidden rounded-xl border border-slate-200"><table><thead><tr><th>Colegiado</th><th>Correo registrado</th><th>Acceso</th><th className="text-right">Acciones</th></tr></thead><tbody>{memberAccessRecords.map((dec) => <tr key={dec.id}><td><strong>{dec.apellido}, {dec.nombres}</strong><span>DNI {dec.dni || '—'} · M.P. {dec.matricula || '—'}</span>{dec.memberProvisional && <em className="cokifimi-access-form-pending">Sin formulario presentado</em>}</td><td>{dec.email || 'Sin correo registrado'}</td><td><span className={`cokifimi-access-badge ${memberEnabled(dec) ? tokenBlocked(dec) ? 'is-disabled' : dec.memberAccessTokenHash ? 'is-enabled' : 'is-pending' : 'is-disabled'}`}>{accessLabel(dec)}</span></td><td><div className="cokifimi-access-actions"><button type="button" onClick={() => onMemberAccess(dec)} className={`cokifimi-access-action ${memberEnabled(dec) ? 'is-danger' : 'is-success'}`}>{memberEnabled(dec) ? 'Dar de baja' : 'Dar de alta'}</button><button type="button" onClick={() => { setShowMemberAccessModal(false); onEdit(dec); }} className="cokifimi-access-action is-neutral">Editar correo</button><button type="button" disabled={!dec.memberAccessTokenHash && !tokenBlocked(dec)} onClick={() => { if (window.confirm(`¿Restablecer el token de ${dec.apellido}, ${dec.nombres}? Deberá crear uno nuevo desde el portal.`)) onResetMemberToken(dec); }} className="cokifimi-access-action is-token"><KeyRound /> Restablecer token</button><button type="button" title="Eliminar colegiado, token y declaración" disabled={deletingMemberAccount === dec.dni} onClick={() => removeMemberAccount(dec)} className="cokifimi-access-action is-delete-member"><Trash2 /> {deletingMemberAccount === dec.dni ? 'Eliminando...' : 'Eliminar'}</button></div></td></tr>)}</tbody></table></div>{memberAccessRecords.length === 0 && <div className="cokifimi-access-empty"><p>No se encontraron colegiados con esos datos.</p>{memberAccessSearch.replace(/\D/g, '').length >= 7 && <button type="button" onClick={syncLegacyAccount} disabled={syncingLegacyAccount}><KeyRound /> {syncingLegacyAccount ? 'Sincronizando acceso...' : 'Incorporar acceso con token existente'}</button>}</div>}</div>
         </section>
       </div>, document.body)}
+
+      {showBianualExcelModal && createPortal(
+        <div className="cokifimi-excel-export-modal" role="dialog" aria-modal="true" aria-labelledby="bianual-excel-title">
+          <section className="cokifimi-excel-export-dialog">
+            <header><div><span>EXPORTACIÓN ADMINISTRATIVA</span><h2 id="bianual-excel-title"><FileSpreadsheet /> Fichas bianuales a Excel</h2><p>Seleccioná colegiados. Se descargará una fila completa por cada ficha.</p></div><button type="button" onClick={() => setShowBianualExcelModal(false)} aria-label="Cerrar"><X /></button></header>
+            <div className="cokifimi-excel-export-controls"><label><Search /><input type="search" value={bianualExcelSearch} onChange={(event) => setBianualExcelSearch(event.target.value)} placeholder="Buscar por nombre, matrícula, DNI o correo" /></label><button type="button" onClick={toggleAllBianualExcelFiltered} disabled={!bianualExcelFiltered.length}>{areAllBianualExcelFilteredSelected ? 'Quitar selección visible' : 'Seleccionar resultados'} ({bianualExcelFiltered.length})</button></div>
+            <div className="cokifimi-excel-export-list">{bianualExcelFiltered.map((dec) => <label key={dec.id} className={selectedBianualExcelSet.has(dec.id) ? 'is-selected' : ''}><input type="checkbox" checked={selectedBianualExcelSet.has(dec.id)} onChange={() => toggleBianualExcelSelection(dec.id)} /><span><strong>{dec.apellido}, {dec.nombres}</strong><small>M.P. {dec.matricula || '—'} · DNI {dec.dni || '—'}</small></span></label>)}{!bianualExcelFiltered.length && <p>No hay colegiados que coincidan con la búsqueda.</p>}</div>
+            <footer><span>{selectedBianualExcelIds.length} colegiado{selectedBianualExcelIds.length === 1 ? '' : 's'} seleccionado{selectedBianualExcelIds.length === 1 ? '' : 's'}</span><div><button type="button" onClick={() => setShowBianualExcelModal(false)}>Cancelar</button><button type="button" onClick={exportSelectedBianualExcel} disabled={!selectedBianualExcelIds.length}><FileSpreadsheet /> Descargar Excel</button></div></footer>
+          </section>
+        </div>, document.body
+      )}
 
       {photoRecord && photoRecord.fotoUrl && <div className="cokifimi-photo-viewer-modal fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/70 p-4" role="dialog" aria-modal="true">
         <div className="cokifimi-photo-viewer-dialog relative w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">

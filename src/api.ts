@@ -89,7 +89,7 @@ export const saveServerRecord = (data: DeclarationData) => request(
   { method: isAdminMode() ? 'PUT' : 'POST', body: JSON.stringify(data) },
 ) as Promise<DeclarationData>;
 
-export const updateConsultorioServer = (data: DeclarationData) => request('/consultorio/update', {
+export const updateConsultorioSuspensionServer = (data: { recordId: string; matricula?: string; consultorioSolicitudId?: string; requestIndex?: number; message: string; active: boolean }) => request('/consultorio/suspension', { method: 'POST', body: JSON.stringify(data) }) as Promise<{ updated: boolean }>;export const updateConsultorioServer = (data: DeclarationData) => request('/consultorio/update', {
   method: 'POST',
   body: JSON.stringify({ recordId: data.id, consultorioSolicitudId: data.consultorioSolicitudId, formularioHabilitacionConsultorio: data.formularioHabilitacionConsultorio }),
 }) as Promise<DeclarationData>;
@@ -145,6 +145,9 @@ export const memberSaveRecord = async (data: DeclarationData) => {
 };
 export const memberAddConsultorio = (consultorio: ConsultorioData) => request('/member/consultorios', {
   method: 'POST', body: JSON.stringify({ consultorio }),
+}) as Promise<DeclarationData>;
+export const memberUpdateConsultorioLimited = (consultorioSolicitudId: string | undefined, updates: Record<string, unknown>) => request('/member/consultorio-limited-update', {
+  method: 'POST', body: JSON.stringify({ consultorioSolicitudId, updates }),
 }) as Promise<DeclarationData>;
 export const memberManageAttached = (action: 'associate' | 'remove', matricula: string, consultorioSolicitudId?: string) => request('/member/attached-professionals', {
   method: 'POST', body: JSON.stringify({ action, matricula, consultorioSolicitudId }),

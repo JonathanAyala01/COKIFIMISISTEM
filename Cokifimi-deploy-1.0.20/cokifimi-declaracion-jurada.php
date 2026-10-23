@@ -143,7 +143,9 @@ function cokifimi_dj_portal_login(WP_REST_Request $request) {
     $users = cokifimi_dj_portal_users();
     $password_hash = isset($users[$username]) ? $users[$username] : '';
 
-    if ($username !== COKIFIMI_DJ_PORTAL_USER || !$password_hash || !wp_check_password($password, $password_hash)) {
+    // El usuario puede haberse creado o cambiado desde "Configurar acceso".
+    // No limitar el inicio de sesión al usuario histórico fijo.
+    if (!$username || !$password_hash || !wp_check_password($password, $password_hash)) {
         return new WP_Error('invalid_login', 'Usuario o contraseña incorrectos.', array('status' => 401));
     }
 
@@ -247,6 +249,25 @@ function cokifimi_dj_hydrate_member_access($record) {
     return $record;
 }
 
+function cokifimi_dj_email_already_registered($email, $exclude_record_id = '', $exclude_dni = '') {
+    global $wpdb;
+    $normalized_email = strtolower(trim((string) $email));
+    if ($normalized_email === '') return false;
+    $table = cokifimi_dj_table_name();
+    $rows = $wpdb->get_results("SELECT record_id, payload FROM {$table}");
+    foreach ((array) $rows as $row) {
+        if ((string) $row->record_id === (string) $exclude_record_id) continue;
+        $record = json_decode((string) ($row->payload ?? ''), true);
+        if (is_array($record) && strtolower(trim((string) ($record['email'] ?? ''))) === $normalized_email) return true;
+    }
+    $excluded_account_key = cokifimi_dj_member_account_key($exclude_dni);
+    foreach (cokifimi_dj_member_accounts() as $account_key => $account) {
+        if ((string) $account_key === $excluded_account_key) continue;
+        if (is_array($account) && strtolower(trim((string) ($account['email'] ?? ''))) === $normalized_email) return true;
+    }
+    return false;
+}
+
 function cokifimi_dj_is_secure_member_token($token, $dni) {
     if (!preg_match('/^\d{6}$/', $token) || preg_match('/^(\d)\1{5}$/', $token)) return false;
     if (preg_match('/012|123|234|345|456|567|678|789|987|876|765|654|543|432|321|210/', $token)) return false;
@@ -319,6 +340,9 @@ function cokifimi_dj_member_request_code(WP_REST_Request $request) {
     $record = $row ? cokifimi_dj_decode_record($row) : array();
     $accounts = cokifimi_dj_member_accounts();
     $account = $accounts[cokifimi_dj_member_account_key($dni)] ?? array();
+    if (cokifimi_dj_email_already_registered($email, $row ? $row->record_id : '', $dni)) {
+        return new WP_Error('email_already_registered', 'El correo ya está registrado en otra cuenta de colegiado.', array('status' => 409));
+    }
     if ($row && array_key_exists('memberEnabled', $record) && !$record['memberEnabled']) {
         return new WP_Error('member_access_disabled', 'El acceso de este colegiado fue dado de baja. Comuníquese con la Administración del Colegio.', array('status' => 403));
     }
@@ -367,6 +391,9 @@ function cokifimi_dj_member_verify_and_create_token(WP_REST_Request $request) {
     $row = cokifimi_dj_find_record_by_dni($dni);
     if (!$verification || !wp_check_password($code, $verification['hash']) || ($row && $verification['record_id'] !== $row->record_id) || (!$row && empty($verification['new_member']))) {
         return new WP_Error('invalid_verification', 'El código es incorrecto o venció.', array('status' => 401));
+    }
+    if (cokifimi_dj_email_already_registered($email, $row ? $row->record_id : '', $dni)) {
+        return new WP_Error('email_already_registered', 'El correo ya está registrado en otra cuenta de colegiado.', array('status' => 409));
     }
     $record = null;
     if ($row) {
@@ -514,6 +541,234 @@ function cokifimi_dj_delete_member_account(WP_REST_Request $request) {
     return rest_ensure_response(array('deleted' => true));
 }
 
+function cokifimi_dj_store_professional_photo($record_id, $matricula, $field, $value) {
+    if (!is_string($value) || strpos($value, 'data:') !== 0) return $value;
+    if (!preg_match('~^data:(image/(?:jpeg|png|gif|webp|heic))((?:;[a-zA-Z0-9!#$&^_.+-]+(?:=[^;,\\r\\n]*)?)*)?;base64,([A-Za-z0-9+/=\\s]+)$~sD', $value, $matches)) {
+        return new WP_Error('invalid_photo_data_url', 'La foto tiene un formato de datos no válido.', array('status' => 400));
+    }
+
+    $mime = strtolower($matches[1]);
+    $base64 = preg_replace('/\\s+/', '', $matches[3]);
+    $binary = base64_decode($base64, true);
+    if ($base64 === '' || $binary === false) {
+        return new WP_Error('invalid_photo_base64', 'La foto tiene datos Base64 no válidos.', array('status' => 400));
+    }
+    if (strlen($binary) > 10 * 1024 * 1024) {
+        return new WP_Error('photo_too_large', 'La foto supera el límite permitido de 10 MB.', array('status' => 400));
+    }
+
+    $signatures = array(
+        'image/jpeg' => substr($binary, 0, 3) === hex2bin('ffd8ff'),
+        'image/png' => substr($binary, 0, 8) === hex2bin('89504e470d0a1a0a'),
+        'image/gif' => in_array(substr($binary, 0, 6), array('GIF87a', 'GIF89a'), true),
+        'image/webp' => substr($binary, 0, 4) === 'RIFF' && substr($binary, 8, 4) === 'WEBP',
+        'image/heic' => substr($binary, 4, 4) === 'ftyp' && in_array(substr($binary, 8, 4), array('heic', 'heix', 'hevc', 'hevx', 'mif1', 'msf1'), true),
+    );
+    if (empty($signatures[$mime])) {
+        return new WP_Error('photo_mime_mismatch', 'El contenido de la foto no coincide con su tipo MIME.', array('status' => 400));
+    }
+
+    $extensions = array('image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp', 'image/heic' => 'heic');
+    $safe_record_id = sanitize_file_name((string) $record_id);
+    $safe_matricula = sanitize_file_name((string) $matricula);
+    $safe_field = sanitize_file_name((string) $field);
+    $content_hash = substr(hash('sha256', $binary), 0, 16);
+    $filename = sanitize_file_name($safe_record_id . '-' . ($safe_matricula !== '' ? $safe_matricula : 'sin-matricula') . '-' . $safe_field . '-' . $content_hash . '.' . $extensions[$mime]);
+
+    $upload_dir = wp_upload_dir();
+    if (!empty($upload_dir['error'])) {
+        return new WP_Error('photo_upload_directory_error', $upload_dir['error'], array('status' => 500));
+    }
+    $path = trailingslashit($upload_dir['basedir']) . $filename;
+    $created_file = false;
+    if (file_exists($path)) {
+        if (!is_file($path) || !hash_equals(hash_file('sha256', $path), hash('sha256', $binary))) {
+            return new WP_Error('photo_filename_conflict', 'Ya existe un archivo incompatible para esta foto.', array('status' => 500));
+        }
+    } else {
+        $written = file_put_contents($path, $binary, LOCK_EX);
+        if ($written === false || $written !== strlen($binary)) {
+            if (file_exists($path)) wp_delete_file($path);
+            return new WP_Error('photo_upload_failed', 'No se pudo guardar la foto en uploads.', array('status' => 500));
+        }
+        $created_file = true;
+    }
+
+    require_once ABSPATH . 'wp-admin/includes/image.php';
+    require_once ABSPATH . 'wp-admin/includes/file.php';
+    require_once ABSPATH . 'wp-admin/includes/media.php';
+    $attachment_id = wp_insert_attachment(array(
+        'post_mime_type' => $mime,
+        'post_title' => pathinfo($filename, PATHINFO_FILENAME),
+        'post_status' => 'inherit',
+    ), $path, 0, true);
+    if (is_wp_error($attachment_id)) {
+        if ($created_file) wp_delete_file($path);
+        return new WP_Error('photo_attachment_failed', 'No se pudo registrar la foto en la biblioteca de medios.', array('status' => 500));
+    }
+
+    if (wp_attachment_is_image($attachment_id)) {
+        $metadata = wp_generate_attachment_metadata($attachment_id, $path);
+        if (is_array($metadata)) {
+            $metadata_updated = wp_update_attachment_metadata($attachment_id, $metadata);
+            // WordPress returns false both on failure and when metadata is unchanged.
+            // The original photo URL remains usable even if thumbnail metadata cannot be saved.
+            if (!$metadata_updated && wp_get_attachment_metadata($attachment_id) !== $metadata) {
+                error_log('COKIFIMI: attachment metadata was not persisted for attachment #' . (int) $attachment_id . '; keeping original photo.');
+            }
+        } else {
+            // Do not roll back the declaration or delete the original photo only
+            // because this host could not generate image sizes/metadata.
+            error_log('COKIFIMI: attachment metadata generation failed for attachment #' . (int) $attachment_id . '; keeping original photo.');
+        }
+    }
+
+    return array('url' => trailingslashit($upload_dir['baseurl']) . rawurlencode($filename), 'id' => (int) $attachment_id, 'mime' => $mime);
+}
+
+function cokifimi_dj_store_form_professional_photos($record_id, &$form) {
+    if (!is_array($form)) return true;
+    for ($slot = 1; $slot <= 13; $slot++) {
+        $suffix = $slot === 1 ? '' : (string) $slot;
+        $photo_key = 'adjuntoFotoUrl' . $suffix;
+        if (!isset($form[$photo_key]) || !is_string($form[$photo_key]) || strpos($form[$photo_key], 'data:') !== 0) continue;
+        $matricula_key = 'adjuntoMatricula' . $suffix;
+        $stored = cokifimi_dj_store_professional_photo($record_id, $form[$matricula_key] ?? '', $photo_key, $form[$photo_key]);
+        if (is_wp_error($stored)) return $stored;
+        $form[$photo_key] = $stored['url'];
+    }
+    return true;
+}
+
+function cokifimi_dj_store_record_professional_photos($record_id, &$record) {
+    if (isset($record['fotoUrl']) && is_string($record['fotoUrl']) && strpos($record['fotoUrl'], 'data:') === 0) {
+        $stored = cokifimi_dj_store_professional_photo($record_id, $record['matricula'] ?? '', 'fotoUrl', $record['fotoUrl']);
+        if (is_wp_error($stored)) return $stored;
+        $record['fotoUrl'] = $stored['url'];
+    }
+    if (isset($record['formularioHabilitacionConsultorio']) && is_array($record['formularioHabilitacionConsultorio'])) {
+        $stored = cokifimi_dj_store_form_professional_photos($record_id, $record['formularioHabilitacionConsultorio']);
+        if (is_wp_error($stored)) return $stored;
+    }
+    foreach ((array) ($record['consultorioSolicitudes'] ?? array()) as $index => $request_item) {
+        if (!is_array($request_item) || !isset($request_item['formularioHabilitacionConsultorio']) || !is_array($request_item['formularioHabilitacionConsultorio'])) continue;
+        $stored = cokifimi_dj_store_form_professional_photos($record_id, $record['consultorioSolicitudes'][$index]['formularioHabilitacionConsultorio']);
+        if (is_wp_error($stored)) return $stored;
+    }
+    return true;
+}
+
+/** Store validated Base64 file Data URLs as WordPress uploads before payload writes. */
+function cokifimi_dj_store_data_url_attachment($record_id, $field_path, $value) {
+    if (!is_string($value) || strpos($value, 'data:') !== 0) return $value;
+    if (!preg_match('~^data:([a-zA-Z0-9.+-]+/[a-zA-Z0-9.+-]+)(?:;[a-zA-Z0-9!#$&^_.+-]+(?:=[^;,\\r\\n]*)?)*;base64,([A-Za-z0-9+/=\\s]+)$~sD', $value, $matches)) {
+        return new WP_Error('invalid_attachment_data_url', 'Un archivo adjunto tiene un formato de datos no válido.', array('status' => 400));
+    }
+    $mime = strtolower($matches[1]);
+    $base64 = preg_replace('/\\s+/', '', $matches[2]);
+    $binary = base64_decode($base64, true);
+    if ($base64 === '' || $binary === false) return new WP_Error('invalid_attachment_base64', 'Un archivo adjunto tiene datos Base64 no válidos.', array('status' => 400));
+    if (strlen($binary) > 15 * 1024 * 1024) return new WP_Error('attachment_too_large', 'El archivo adjunto supera el límite permitido de 15 MB.', array('status' => 400));
+
+    $types = array(
+        'image/jpeg' => array('jpg', 'image/jpeg'), 'image/png' => array('png', 'image/png'),
+        'image/gif' => array('gif', 'image/gif'), 'image/webp' => array('webp', 'image/webp'),
+        'image/heic' => array('heic', 'image/heic'), 'application/pdf' => array('pdf', 'application/pdf'),
+    );
+    if (!isset($types[$mime])) return new WP_Error('unsupported_attachment_mime', 'El tipo MIME del archivo adjunto no está permitido.', array('status' => 400));
+
+    $actual_mime = '';
+    if (function_exists('finfo_open')) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo) { $actual_mime = (string) finfo_buffer($finfo, $binary); finfo_close($finfo); }
+    }
+    if ($mime === 'image/heic') {
+        $valid_content = substr($binary, 4, 4) === 'ftyp' && in_array(substr($binary, 8, 4), array('heic', 'heix', 'hevc', 'hevx', 'mif1', 'msf1'), true);
+    } elseif ($mime === 'application/pdf') {
+        $valid_content = strpos($binary, '%PDF-') === 0 && (!$actual_mime || in_array($actual_mime, array('application/pdf', 'application/x-pdf', 'application/octet-stream'), true));
+    } else {
+        $mime_aliases = array('image/x-png' => 'image/png', 'image/jpg' => 'image/jpeg');
+        $actual_mime = $mime_aliases[$actual_mime] ?? $actual_mime;
+        if ($actual_mime) {
+            $valid_content = $actual_mime === $types[$mime][1];
+        } else {
+            $signatures = array(
+                'image/jpeg' => substr($binary, 0, 3) === hex2bin('ffd8ff'),
+                'image/png' => substr($binary, 0, 8) === hex2bin('89504e470d0a1a0a'),
+                'image/gif' => in_array(substr($binary, 0, 6), array('GIF87a', 'GIF89a'), true),
+                'image/webp' => substr($binary, 0, 4) === 'RIFF' && substr($binary, 8, 4) === 'WEBP',
+            );
+            $valid_content = !empty($signatures[$mime]);
+        }
+    }
+    if (!$valid_content) return new WP_Error('attachment_mime_mismatch', 'El contenido del archivo no coincide con su tipo MIME.', array('status' => 400));
+
+    $upload_dir = wp_upload_dir();
+    if (!empty($upload_dir['error'])) return new WP_Error('attachment_upload_directory_error', $upload_dir['error'], array('status' => 500));
+    $safe_record_id = sanitize_file_name((string) $record_id);
+    $safe_field = sanitize_file_name((string) $field_path);
+    $hash = substr(hash('sha256', $binary), 0, 20);
+    $filename = sanitize_file_name($safe_record_id . '-' . ($safe_field !== '' ? $safe_field : 'adjunto') . '-' . $hash . '.' . $types[$mime][0]);
+    $path = trailingslashit($upload_dir['basedir']) . $filename;
+    $created_file = false;
+    if (file_exists($path)) {
+        if (!is_file($path) || !hash_equals(hash_file('sha256', $path), hash('sha256', $binary))) return new WP_Error('attachment_filename_conflict', 'Ya existe un archivo incompatible para este adjunto.', array('status' => 500));
+    } else {
+        $written = file_put_contents($path, $binary, LOCK_EX);
+        if ($written === false || $written !== strlen($binary)) {
+            if (file_exists($path)) wp_delete_file($path);
+            return new WP_Error('attachment_upload_failed', 'No se pudo guardar el archivo adjunto en uploads.', array('status' => 500));
+        }
+        $created_file = true;
+    }
+
+    require_once ABSPATH . 'wp-admin/includes/image.php';
+    $url = trailingslashit($upload_dir['baseurl']) . rawurlencode($filename);
+    $attachment_id = attachment_url_to_postid($url);
+    if (!$attachment_id) {
+        $attachment_id = wp_insert_attachment(array('post_mime_type' => $mime, 'post_title' => pathinfo($filename, PATHINFO_FILENAME), 'post_status' => 'inherit'), $path, 0, true);
+        if (is_wp_error($attachment_id)) {
+            if ($created_file) wp_delete_file($path);
+            return new WP_Error('attachment_registration_failed', 'No se pudo registrar el archivo en la biblioteca de medios.', array('status' => 500));
+        }
+        if (wp_attachment_is_image($attachment_id)) {
+            $metadata = wp_generate_attachment_metadata($attachment_id, $path);
+            if (is_array($metadata)) {
+                $metadata_updated = wp_update_attachment_metadata($attachment_id, $metadata);
+                // Un metadato de miniatura fallido no debe bloquear el comprobante
+                // original ni la aprobación; la URL del archivo sigue siendo válida.
+                if (!$metadata_updated && wp_get_attachment_metadata($attachment_id) !== $metadata) {
+                    error_log('COKIFIMI: metadata not persisted for attachment #' . (int) $attachment_id . '; keeping original upload.');
+                }
+            } else {
+                error_log('COKIFIMI: metadata generation failed for attachment #' . (int) $attachment_id . '; keeping original upload.');
+            }
+        }
+    }
+    return array('url' => $url, 'id' => (int) $attachment_id, 'mime' => $mime, 'name' => $filename);
+}
+
+function cokifimi_dj_store_data_urls_recursive($record_id, &$value, $path = '') {
+    if (is_string($value) && strpos($value, 'data:') === 0) {
+        $stored = cokifimi_dj_store_data_url_attachment($record_id, $path, $value);
+        if (is_wp_error($stored)) return $stored;
+        $value = $stored['url'];
+        return true;
+    }
+    if (!is_array($value)) return true;
+    foreach ($value as $key => &$child) {
+        $child_path = $path === '' ? (string) $key : $path . '-' . (string) $key;
+        $result = cokifimi_dj_store_data_urls_recursive($record_id, $child, $child_path);
+        if (is_wp_error($result)) { unset($child); return $result; }
+    }
+    unset($child);
+    return true;
+}
+
+function cokifimi_dj_store_record_data_urls($record_id, &$record) {
+    return cokifimi_dj_store_data_urls_recursive($record_id, $record);
+}
+
 function cokifimi_dj_store_consultorio_attachment($record_id, $key, $value) {
     $attachment_suffix = '';
     if (preg_match('/Adjunto(2)?$/', (string) $key, $suffix_match)) {
@@ -535,25 +790,11 @@ function cokifimi_dj_store_consultorio_attachment($record_id, $key, $value) {
         'comprobantePagoUrl' => 'comprobante-libre-deuda-admin',
     );
     if (!isset($allowed[$key])) return null;
+    $stored = cokifimi_dj_store_data_url_attachment($record_id, $allowed[$key] . $attachment_suffix, $value);
+    if (is_wp_error($stored)) return $stored;
+    return array('url' => $stored['url'], 'name' => $stored['name'], 'mime' => $stored['mime'], 'id' => $stored['id']);
     $binary = base64_decode($matches[2], true);
     if ($binary === false || strlen($binary) > 15 * 1024 * 1024) return new WP_Error('attachment_too_large', 'El archivo adjunto supera el límite permitido de 15 MB.', array('status' => 400));
-    $mime = sanitize_mime_type($matches[1]);
-    $extension = $mime === 'application/pdf' ? 'pdf' : (strpos($mime, 'image/') === 0 ? substr($mime, 6) : 'bin');
-    $filename = sanitize_file_name($record_id . '-' . $allowed[$key] . $attachment_suffix . '.' . $extension);
-    $upload = wp_upload_bits($filename, null, $binary);
-    if (!empty($upload['error'])) return new WP_Error('attachment_upload_failed', $upload['error'], array('status' => 500));
-    require_once ABSPATH . 'wp-admin/includes/image.php';
-    require_once ABSPATH . 'wp-admin/includes/file.php';
-    require_once ABSPATH . 'wp-admin/includes/media.php';
-    $attachment_id = wp_insert_attachment(array(
-        'post_mime_type' => $mime,
-        'post_title' => $allowed[$key] . '-' . $record_id,
-        'post_status' => 'inherit',
-    ), $upload['file'], 0, true);
-    if (!is_wp_error($attachment_id) && wp_attachment_is_image($attachment_id)) {
-        wp_update_attachment_metadata($attachment_id, wp_generate_attachment_metadata($attachment_id, $upload['file']));
-    }
-    return array('url' => $upload['url'], 'name' => basename($upload['file']), 'mime' => $mime, 'id' => is_wp_error($attachment_id) ? 0 : (int) $attachment_id);
 }
 
 function cokifimi_dj_member_save_record(WP_REST_Request $request) {
@@ -563,7 +804,9 @@ function cokifimi_dj_member_save_record(WP_REST_Request $request) {
     $data = $request->get_json_params();
     $notify_consultorio_submission = false;
     if (!$session || !is_array($data)) return new WP_Error('member_update_denied', 'No tiene permiso para actualizar este registro.', array('status' => 403));
-    if (!$row && empty($session['record_id'])) {
+    // Si una sesión conserva un record_id de un registro eliminado, debe tratarse
+    // como un alta nueva para poder validar la matrícula y dar un error útil.
+    if (!$row) {
         // La matrícula es única aunque se envíe con ceros iniciales (0122 = 122).
         $matricula_normalizada = preg_replace('/^0+(?=\d)/', '', preg_replace('/\D+/', '', (string) ($data['matricula'] ?? '')));
         if ($matricula_normalizada === '') return new WP_Error('invalid_member_matricula', 'Ingrese una matrícula válida.', array('status' => 400));
@@ -584,12 +827,19 @@ function cokifimi_dj_member_save_record(WP_REST_Request $request) {
         $data['email'] = $account['email'] ?? ($data['email'] ?? '');
         $data['createdAt'] = $now;
         $data['updatedAt'] = $now;
+        $official_date = new DateTimeImmutable('now', new DateTimeZone('America/Argentina/Buenos_Aires'));
+        $data['fechaPresentacion'] = $official_date->format('Y-m-d');
+        $data['fechaVencimiento'] = $official_date->modify('+2 years')->format('Y-m-d');
         // Keep dates/matricula supplied by the first member submission. They
         // used to be unconditionally cleared here, which made them disappear
         // immediately after saving the declaration.
         $data['fechaMatriculacion'] = (string) ($data['fechaMatriculacion'] ?? '');
         $data['fechaMatriculacionAdmin'] = !empty($data['fechaMatriculacionAdmin']);
         $data['memberAccessTokenHash'] = $account['token_hash'] ?? '';
+        $photo_result = cokifimi_dj_store_record_professional_photos($data['id'], $data);
+        if (is_wp_error($photo_result)) return $photo_result;
+        $attachment_result = cokifimi_dj_store_record_data_urls($data['id'], $data);
+        if (is_wp_error($attachment_result)) return $attachment_result;
         $created = $wpdb->insert(cokifimi_dj_table_name(), array(
             'record_id' => $data['id'],
             'dni' => $data['dni'],
@@ -605,6 +855,20 @@ function cokifimi_dj_member_save_record(WP_REST_Request $request) {
         return rest_ensure_response($data);
     }
     $existing = $row ? cokifimi_dj_decode_record($row) : array();
+    // El acceso crea primero un registro provisorio sin matrícula. Al completar
+    // la Bianual, validar también esta actualización antes de confirmarla.
+    $matricula_normalizada = preg_replace('/^0+(?=\d)/', '', preg_replace('/\D+/', '', (string) ($data['matricula'] ?? '')));
+    if ($matricula_normalizada !== '') {
+        $matricula_rows = $wpdb->get_results('SELECT record_id, payload FROM ' . cokifimi_dj_table_name());
+        foreach ((array) $matricula_rows as $matricula_row) {
+            if ((string) $matricula_row->record_id === (string) $row->record_id) continue;
+            $stored = json_decode((string) ($matricula_row->payload ?? ''), true);
+            $stored_matricula = preg_replace('/^0+(?=\d)/', '', preg_replace('/\D+/', '', (string) ($stored['matricula'] ?? '')));
+            if ($stored_matricula !== '' && $stored_matricula === $matricula_normalizada) {
+                return new WP_Error('member_matricula_exists', 'La matrícula ya está registrada. No se puede crear otra declaración con la misma matrícula.', array('status' => 409));
+            }
+        }
+    }
     $incoming_libre_deuda = is_array($data['libreDeudaSolicitud'] ?? null) ? $data['libreDeudaSolicitud'] : array();
     // Compatibilidad: versiones anteriores enviaban el comprobante del colegiado
     // en comprobantePagoUrl. Siempre se normaliza y almacena en su campo propio.
@@ -672,7 +936,7 @@ function cokifimi_dj_member_save_record(WP_REST_Request $request) {
             }
         }
         foreach ($preserved_form as $attachment_key => $attachment_value) {
-            $is_attachment_field = preg_match('/^(certificadoAnssalArchivo|polizaPraxisArchivo|planoMunicipalArchivo|certificadoBomberosArchivo|comprobantePagoArchivo|reciboPagoArchivo|comprobantePagoUrl|certificadoUrl|certificadoConsultorioUrl|certificadoEticaUrl)/', (string) $attachment_key);
+            $is_attachment_field = preg_match('/^(adjuntoFotoUrl(?:[2-8])?|certificadoAnssalArchivo|polizaPraxisArchivo|planoMunicipalArchivo|certificadoBomberosArchivo|comprobantePagoArchivo|reciboPagoArchivo|comprobantePagoUrl|certificadoUrl|certificadoConsultorioUrl|certificadoEticaUrl)/', (string) $attachment_key);
             if ($is_attachment_field && (!array_key_exists($attachment_key, $formulario_2_limpio) || $formulario_2_limpio[$attachment_key] === '') && $attachment_value !== '') {
                 $formulario_2_limpio[$attachment_key] = $attachment_value;
             }
@@ -740,6 +1004,10 @@ function cokifimi_dj_member_save_record(WP_REST_Request $request) {
         if (!empty($existing[$field])) $data[$field] = $existing[$field];
         elseif (!array_key_exists($field, $data)) $data[$field] = '';
     }
+    $photo_result = cokifimi_dj_store_record_professional_photos($row->record_id, $data);
+    if (is_wp_error($photo_result)) return $photo_result;
+    $attachment_result = cokifimi_dj_store_record_data_urls($row->record_id, $data);
+    if (is_wp_error($attachment_result)) return $attachment_result;
     $data['memberProvisional'] = false;
     $data['updatedAt'] = current_time('mysql', true);
     $updated = $wpdb->update(cokifimi_dj_table_name(), array(
@@ -755,6 +1023,96 @@ function cokifimi_dj_member_save_record(WP_REST_Request $request) {
     return rest_ensure_response($data);
 }
 
+// Edición acotada del Alta: el colegiado sólo puede modificar instalaciones y
+// reemplazar sus dos adjuntos, siempre dentro de la solicitud indicada.
+function cokifimi_dj_member_limited_consultorio_update(WP_REST_Request $request) {
+    global $wpdb;
+    $session = cokifimi_dj_member_session();
+    if (!$session) return new WP_Error('member_update_denied', 'No tiene permiso para actualizar este registro.', array('status' => 403));
+    $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . cokifimi_dj_table_name() . ' WHERE record_id = %s', $session['record_id']));
+    $payload = $request->get_json_params();
+    $updates = is_array($payload['updates'] ?? null) ? $payload['updates'] : array();
+    if (!$row || !$updates) return new WP_Error('invalid_consultorio_update', 'Datos de actualización inválidos.', array('status' => 400));
+
+    $record = cokifimi_dj_decode_record($row);
+    $request_id = sanitize_key($payload['consultorioSolicitudId'] ?? '');
+    $allowed_checks = array('puertasIngresoAdaptadas', 'puertasInternasAdaptadas', 'rampas', 'escaleras', 'escalerasPasamanos', 'ascensor', 'instalacionElectrica', 'descargaTierra', 'sistemaTrifasico', 'disyuntor', 'alarmaHumo', 'salidaEmergencia', 'aireConsultorio', 'ventilacionPasivaConsultorio', 'ventilacionForzadaConsultorio', 'boxes', 'aireEspera', 'ventilacionPasivaEspera', 'ventilacionForzadaEspera', 'bano', 'inodoro', 'lavatorio', 'aguaCaliente', 'ducha', 'banoAdaptado', 'gimnasioTerapeutico', 'gimnasioDeportivo');
+    $allowed_documents = array('planoMunicipalArchivo', 'certificadoBomberosArchivo');
+    $apply_updates = function ($form) use ($updates, $allowed_checks, $allowed_documents, $row) {
+        $form = is_array($form) ? $form : array();
+        foreach ($allowed_checks as $key) {
+            if (!array_key_exists($key, $updates)) continue;
+            $value = strtoupper(sanitize_text_field((string) $updates[$key]));
+            if (in_array($value, array('SI', 'NO'), true)) $form[$key] = $value;
+        }
+        foreach ($allowed_documents as $key) {
+            if (!array_key_exists($key, $updates) || !is_string($updates[$key]) || strpos($updates[$key], 'data:') !== 0) continue;
+            $attachment = cokifimi_dj_store_consultorio_attachment($row->record_id, $key, $updates[$key]);
+            if (is_wp_error($attachment)) return $attachment;
+            if ($attachment) {
+                $form[$key] = $attachment['url'];
+                $form[$key . 'Nombre'] = $attachment['name'];
+                $form[$key . 'Mime'] = $attachment['mime'];
+                $form[$key . 'Id'] = $attachment['id'];
+                // Evita que una referencia heredada a la versión anterior se
+                // priorice al volver a abrir el formulario.
+                unset($form[preg_replace('/Archivo$/', 'Url', $key)]);
+            }
+        }
+        return $form;
+    };
+    if ($request_id === '') {
+        $updated_form = $apply_updates($record['formularioHabilitacionConsultorio'] ?? array());
+        if (is_wp_error($updated_form)) return $updated_form;
+        $record['formularioHabilitacionConsultorio'] = $updated_form;
+    } else {
+        $found = false;
+        foreach ((array) ($record['consultorioSolicitudes'] ?? array()) as $index => $item) {
+            if (!is_array($item) || sanitize_key($item['id'] ?? '') !== $request_id) continue;
+            $updated_form = $apply_updates($item['formularioHabilitacionConsultorio'] ?? array());
+            if (is_wp_error($updated_form)) return $updated_form;
+            $record['consultorioSolicitudes'][$index]['formularioHabilitacionConsultorio'] = $updated_form;
+            $found = true;
+            break;
+        }
+        if (!$found) return new WP_Error('consultorio_request_not_found', 'Solicitud de Alta no encontrada.', array('status' => 404));
+    }
+    $record['updatedAt'] = current_time('mysql', true);
+    $updated = $wpdb->update(cokifimi_dj_table_name(), array('payload' => wp_json_encode($record), 'updated_at' => $record['updatedAt']), array('record_id' => $row->record_id), array('%s', '%s'), array('%s'));
+    if ($updated === false) return new WP_Error('consultorio_not_saved', 'No se pudo guardar la actualización.', array('status' => 500));
+    // Señal de confirmación para el portal: evita informar éxito si el sitio
+    // todavía ejecuta una versión anterior del plugin.
+    $record['_limitedConsultorioUpdated'] = true;
+    return rest_ensure_response($record);
+}
+
+
+function cokifimi_dj_attached_association_email($notice) {
+    if (!is_array($notice)) return;
+    $titular = esc_html((string) ($notice['titularNombre'] ?? 'Sin nombre'));
+    $titular_matricula = esc_html((string) ($notice['titularMatricula'] ?? 'Sin informar'));
+    $adjunto = esc_html((string) ($notice['adjuntoNombre'] ?? 'Sin nombre'));
+    $adjunto_matricula = esc_html((string) ($notice['adjuntoMatricula'] ?? 'Sin informar'));
+    $admin_url = 'https://cokifimi.org/index.php/seccion-admin-declaracion-jurada/';
+    return '<!doctype html><html lang="es"><head><meta charset="UTF-8"></head><body style="margin:0;padding:24px;background:#eff8f3;color:#17382e;font-family:Arial,Helvetica,sans-serif;">'
+        . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center">'
+        . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;background:#ffffff;border:1px solid #d8ebe0;border-radius:20px;overflow:hidden;">'
+        . '<tr><td style="padding:25px 30px;background:linear-gradient(135deg,#053d2b,#0f6b49);color:#ffffff;text-align:center;"><div style="font-size:11px;font-weight:700;letter-spacing:1.4px;color:#a7f3d0;">COLEGIO COKIFIMI</div><div style="font-size:22px;font-weight:700;margin-top:6px;">Nuevo adjunto asociado</div></td></tr>'
+        . '<tr><td style="padding:28px 30px;"><p style="margin:0 0 18px;color:#334155;font-size:14px;line-height:1.6;">Se asoci&oacute; un nuevo profesional adjunto a un alta de consultorio aprobada.</p>'
+        . '<div style="padding:16px 18px;background:#f6fbf8;border:1px solid #d8ebe0;border-radius:12px;color:#334155;font-size:14px;line-height:1.8;"><strong>Titular:</strong> ' . $titular . '<br><strong>M.P. titular:</strong> ' . $titular_matricula . '<br><strong>Adjunto asociado:</strong> ' . $adjunto . '<br><strong>M.P. adjunto:</strong> ' . $adjunto_matricula . '</div>'
+        . '<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:25px auto 0;"><tr><td style="border-radius:10px;background:#0f6b49;"><a href="' . esc_url($admin_url) . '" style="display:inline-block;padding:13px 21px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;">Ver en el panel administrativo</a></td></tr></table>'
+        . '</td></tr><tr><td style="padding:16px 30px;border-top:1px solid #e7f0ea;text-align:center;color:#60756a;font-size:12px;">COKIFIMI &middot; Aviso autom&aacute;tico de la plataforma</td></tr></table></td></tr></table></body></html>';
+}
+function cokifimi_dj_send_attached_association_email($notice) {
+    if (!is_array($notice)) return;
+    wp_mail(
+        'colegioklgosmisiones@gmail.com',
+        'Nuevo adjunto asociado a un alta aprobada - COKIFIMI',
+        cokifimi_dj_attached_association_email($notice),
+        array('Content-Type: text/html; charset=UTF-8')
+    );
+}
+add_action('cokifimi_send_attached_association_email', 'cokifimi_dj_send_attached_association_email');
 
 function cokifimi_dj_member_manage_attached(WP_REST_Request $request) {
     global $wpdb;
@@ -787,7 +1145,7 @@ if ($request_id) {
     }
     if (!$found_request) return new WP_Error('consultorio_request_not_found', 'Solicitud de Alta no encontrada.', array('status' => 404));
 }
-$slots = array_merge(array(''), array_map('strval', range(2, 8))); 
+$slots = array_merge(array(''), array_map('strval', range(2, 13)));
     $clear_fields = array('adjuntoApellido','adjuntoNombres','adjuntoDni','adjuntoCuil','adjuntoTitulo','adjuntoObrasSociales','adjuntoAnssal','adjuntoAnssalDesde','adjuntoAnssalHasta','adjuntoCompaniaSeguro','adjuntoPolizaSeguro','adjuntoSeguroDesde','adjuntoSeguroHasta','adjuntoInicioActividad','adjuntoAsociado','adjuntoFotoUrl','certificadoAnssalArchivoAdjunto','certificadoAnssalArchivoAdjuntoNombre','polizaPraxisArchivoAdjunto','polizaPraxisArchivoAdjuntoNombre');
     if ($action === 'remove') {
         foreach ($slots as $suffix) {
@@ -824,7 +1182,7 @@ $slots = array_merge(array(''), array_map('strval', range(2, 8)));
         foreach ($slots as $suffix) if (preg_replace('/\D+/', '', (string) ($form['adjuntoMatricula' . $suffix] ?? '')) === $matricula) return new WP_Error('attached_already_linked', 'Ese profesional ya est� asociado.', array('status' => 400));
         $free_suffix = null;
         foreach ($slots as $suffix) if (empty($form['adjuntoMatricula' . $suffix])) { $free_suffix = $suffix; break; }
-        if ($free_suffix === null) return new WP_Error('attached_limit', 'Ya tiene asociados los ocho profesionales adjuntos permitidos.', array('status' => 400));
+        if ($free_suffix === null) return new WP_Error('attached_limit', 'Ya tiene asociados los trece profesionales adjuntos permitidos.', array('status' => 400));
         $form['adjuntoMatricula' . $free_suffix] = $matricula;
         if ($free_suffix === '2') $form['tipoArea'] = 'Consultorio particular (un titular y dos adjuntos)';
         $target_form = is_array($target['formularioHabilitacionConsultorio'] ?? null) ? $target['formularioHabilitacionConsultorio'] : array();
@@ -853,6 +1211,15 @@ $slots = array_merge(array(''), array_map('strval', range(2, 8)));
 $record['updatedAt'] = current_time('mysql', true);
     $updated = $wpdb->update(cokifimi_dj_table_name(), array('payload' => wp_json_encode($record), 'updated_at' => $record['updatedAt']), array('record_id' => $row->record_id), array('%s', '%s'), array('%s'));
     if ($updated === false) return new WP_Error('attached_update_failed', 'No se pudo actualizar la asociaci�n.', array('status' => 500));
+    if ($action === 'associate' && is_array($target) && (($form['estadoAdmin'] ?? '') === 'APROBADO' || !empty($form['validadoAdmin']))) {
+        wp_schedule_single_event(time() + 1, 'cokifimi_send_attached_association_email', array(
+            'titularNombre' => trim(($record['nombres'] ?? '') . ' ' . ($record['apellido'] ?? '')),
+            'titularMatricula' => (string) ($record['matricula'] ?? ''),
+            'adjuntoNombre' => trim(($target['nombres'] ?? '') . ' ' . ($target['apellido'] ?? '')),
+            'adjuntoMatricula' => (string) ($target['matricula'] ?? $matricula),
+        ));
+    }
+
     return rest_ensure_response($record);
 }
 function cokifimi_dj_member_logout() {
@@ -1052,7 +1419,11 @@ add_action('cokifimi_send_libre_deuda_resolution_email', 'cokifimi_dj_send_libre
 function cokifimi_dj_notify_libre_deuda_resolution(WP_REST_Request $request) {
     global $wpdb;
     $data = $request->get_json_params();
-    $record_id = sanitize_key($data['recordId'] ?? '');
+    $record_id = sanitize_key($data['recordId'] ?? '');    $matricula = sanitize_text_field((string) ($data['matricula'] ?? ''));
+    if ($matricula !== '') {
+        $row_by_matricula = $wpdb->get_row($wpdb->prepare('SELECT record_id FROM ' . cokifimi_dj_table_name() . ' WHERE payload LIKE %s LIMIT 1', '%' . $wpdb->esc_like($matricula) . '%'));
+        if ($row_by_matricula && !empty($row_by_matricula->record_id)) $record_id = sanitize_key($row_by_matricula->record_id);
+    }
     $approved = !empty($data['approved']);
     if (!$record_id) return new WP_Error('invalid_record', 'Solicitud invÃ¡lida.', array('status' => 400));
     $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . cokifimi_dj_table_name() . ' WHERE record_id = %s', $record_id));
@@ -1066,7 +1437,11 @@ function cokifimi_dj_notify_libre_deuda_resolution(WP_REST_Request $request) {
 function cokifimi_dj_notify_consultorio_resolution(WP_REST_Request $request) {
     global $wpdb;
     $data = $request->get_json_params();
-    $record_id = sanitize_key($data['recordId'] ?? '');
+    $record_id = sanitize_key($data['recordId'] ?? '');    $matricula = sanitize_text_field((string) ($data['matricula'] ?? ''));
+    if ($matricula !== '') {
+        $row_by_matricula = $wpdb->get_row($wpdb->prepare('SELECT record_id FROM ' . cokifimi_dj_table_name() . ' WHERE payload LIKE %s LIMIT 1', '%' . $wpdb->esc_like($matricula) . '%'));
+        if ($row_by_matricula && !empty($row_by_matricula->record_id)) $record_id = sanitize_key($row_by_matricula->record_id);
+    }
     $approved = !empty($data['approved']);
     if (!$record_id) return new WP_Error('invalid_record', 'Solicitud inválida.', array('status' => 400));
     $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . cokifimi_dj_table_name() . ' WHERE record_id = %s', $record_id));
@@ -1081,7 +1456,11 @@ function cokifimi_dj_notify_consultorio_resolution(WP_REST_Request $request) {
 function cokifimi_dj_notify_consultorio_amount(WP_REST_Request $request) {
     global $wpdb;
     $data = $request->get_json_params();
-    $record_id = sanitize_key($data['recordId'] ?? '');
+    $record_id = sanitize_key($data['recordId'] ?? '');    $matricula = sanitize_text_field((string) ($data['matricula'] ?? ''));
+    if ($matricula !== '') {
+        $row_by_matricula = $wpdb->get_row($wpdb->prepare('SELECT record_id FROM ' . cokifimi_dj_table_name() . ' WHERE payload LIKE %s LIMIT 1', '%' . $wpdb->esc_like($matricula) . '%'));
+        if ($row_by_matricula && !empty($row_by_matricula->record_id)) $record_id = sanitize_key($row_by_matricula->record_id);
+    }
     if (!$record_id) return new WP_Error('invalid_record', 'Solicitud inválida.', array('status' => 400));
     $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . cokifimi_dj_table_name() . ' WHERE record_id = %s', $record_id));
     if (!$row) return new WP_Error('record_not_found', 'Registro no encontrado.', array('status' => 404));
@@ -1180,7 +1559,7 @@ function cokifimi_dj_dedupe_consultorio_requests($record) {
     return $record;
 }
 function cokifimi_dj_is_persistent_file_field($key) {
-    return (bool) preg_match('/^(fotoUrl|certificado.*(?:Archivo|Url|Nombre|Mime|Id)|poliza.*(?:Archivo|Url|Nombre|Mime|Id)|plano.*(?:Archivo|Url|Nombre|Mime|Id)|comprobante.*(?:Archivo|Url|Nombre|Mime|Id)|recibo.*(?:Archivo|Url|Nombre|Mime|Id))$/i', (string) $key);
+    return (bool) preg_match('/^(fotoUrl|adjuntoFotoUrl(?:[2-8])?|certificado.*(?:Archivo|Url|Nombre|Mime|Id)|poliza.*(?:Archivo|Url|Nombre|Mime|Id)|plano.*(?:Archivo|Url|Nombre|Mime|Id)|comprobante.*(?:Archivo|Url|Nombre|Mime|Id)|recibo.*(?:Archivo|Url|Nombre|Mime|Id))$/i', (string) $key);
 }
 function cokifimi_dj_restore_persistent_files($previous, $incoming) {
     if (!is_array($previous) || !is_array($incoming)) return $incoming;
@@ -1207,7 +1586,23 @@ function cokifimi_dj_restore_persistent_files($previous, $incoming) {
     $data = cokifimi_dj_dedupe_consultorio_requests($data);
     $id = $is_admin && !empty($data['id']) ? sanitize_key($data['id']) : 'dec_' . wp_generate_uuid4();
     $previous_row = $id ? $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . cokifimi_dj_table_name() . ' WHERE record_id = %s', $id)) : null;
-    $previous_record = $previous_row ? cokifimi_dj_decode_record($previous_row) : array();
+    $previous_record = $previous_row ? cokifimi_dj_decode_record($previous_row) : array();    // La matrícula identifica una única declaración bianual. Se permite editar
+    // el mismo registro, pero no crear otro con la misma matrícula normalizada.
+    $matricula_normalizada = preg_replace('/^0+(?=\d)/', '', preg_replace('/\D+/', '', (string) ($data['matricula'] ?? '')));
+    if ($matricula_normalizada !== '') {
+        $matricula_rows = $wpdb->get_results('SELECT record_id, payload FROM ' . cokifimi_dj_table_name());
+        foreach ((array) $matricula_rows as $matricula_row) {
+            if ((string) $matricula_row->record_id === (string) $id) continue;
+            $stored = json_decode((string) ($matricula_row->payload ?? ''), true);
+            $stored_matricula = preg_replace('/^0+(?=\d)/', '', preg_replace('/\D+/', '', (string) ($stored['matricula'] ?? '')));
+            if ($stored_matricula !== '' && $stored_matricula === $matricula_normalizada) {
+                return new WP_Error('matricula_exists', 'La matrícula ya está registrada. No se puede crear otra declaración bianual con la misma matrícula.', array('status' => 409));
+            }
+        }
+    }
+    if (cokifimi_dj_email_already_registered($data['email'] ?? '', $id, $data['dni'] ?? '')) {
+        return new WP_Error('email_exists', 'El correo ya está registrado en otro colegiado.', array('status' => 409));
+    }
     // Las tarjetas del panel reciben un resumen sin binarios. Al guardar desde allí,
     // se restauran foto y adjuntos persistentes para no sobrescribirlos con valores vacíos.
     $data = cokifimi_dj_restore_persistent_files($previous_record, $data);
@@ -1243,8 +1638,18 @@ function cokifimi_dj_restore_persistent_files($previous, $incoming) {
     $now = current_time('mysql', true);
     $created_at = $now;
     $data['id'] = $id;
+    if (!$previous_row) {
+        $official_date = new DateTimeImmutable('now', new DateTimeZone('America/Argentina/Buenos_Aires'));
+        $data['fechaPresentacion'] = $official_date->format('Y-m-d');
+        $data['fechaVencimiento'] = $official_date->modify('+2 years')->format('Y-m-d');
+    }
     $data['createdAt'] = $created_at;
     $data['updatedAt'] = $now;
+
+    $photo_result = cokifimi_dj_store_record_professional_photos($id, $data);
+    if (is_wp_error($photo_result)) return $photo_result;
+    $attachment_result = cokifimi_dj_store_record_data_urls($id, $data);
+    if (is_wp_error($attachment_result)) return $attachment_result;
 
     $result = $wpdb->replace(
         cokifimi_dj_table_name(),
@@ -1320,7 +1725,7 @@ function cokifimi_dj_list_records(WP_REST_Request $request) {
             try {
                 $payload_row = $wpdb->get_row($wpdb->prepare("SELECT payload FROM {$table} WHERE record_id = %s", $row->record_id));
                 if (!$payload_row) continue;
-                $record = cokifimi_dj_decode_record((object) array('record_id' => $row->record_id, 'dni' => $row->dni, 'apellido' => $row->apellido, 'nombres' => $row->nombres, 'created_at' => $row->created_at, 'updated_at' => $row->updated_at, 'payload' => $payload_row->payload));
+                $record = cokifimi_dj_decode_record((object) array("record_id" => $row->record_id, "dni" => $row->dni, "apellido" => $row->apellido, "nombres" => $row->nombres, "created_at" => $row->created_at, "updated_at" => $row->updated_at, "payload" => $payload_row->payload));
                 unset($payload_row);
                 if (!is_array($record)) continue;
                 $record = cokifimi_dj_strip_embedded_files(cokifimi_dj_hydrate_member_access($record));
@@ -1513,13 +1918,46 @@ function cokifimi_dj_delete_all_consultorios(WP_REST_Request $request) {
     return rest_ensure_response(array('deleted' => $deleted));
 }
 
+function cokifimi_dj_update_suspension(WP_REST_Request $request) {
+    global $wpdb;
+    if (!current_user_can('manage_options') && !cokifimi_dj_portal_permission()) return new WP_Error('forbidden', 'No tiene permisos para suspender el Alta.', array('status' => 403));
+    $data = $request->get_json_params();
+    $record_id = sanitize_key($data['recordId'] ?? '');    $matricula = sanitize_text_field((string) ($data['matricula'] ?? ''));
+    if ($matricula !== '') {
+        $row_by_matricula = $wpdb->get_row($wpdb->prepare('SELECT record_id FROM ' . cokifimi_dj_table_name() . ' WHERE payload LIKE %s LIMIT 1', '%' . $wpdb->esc_like($matricula) . '%'));
+        if ($row_by_matricula && !empty($row_by_matricula->record_id)) $record_id = sanitize_key($row_by_matricula->record_id);
+    }
+    $request_index = isset($data['requestIndex']) && is_numeric($data['requestIndex']) ? max(0, (int) $data['requestIndex']) : null;    $request_id = sanitize_key($data['consultorioSolicitudId'] ?? '');
+    if ($request_id !== '') {
+        $row_payload = $wpdb->get_row($wpdb->prepare('SELECT payload FROM ' . cokifimi_dj_table_name() . ' WHERE record_id = %s', $record_id));
+        $payload_data = $row_payload && is_string($row_payload->payload) ? json_decode($row_payload->payload, true) : array();
+        foreach ((array) ($payload_data['consultorioSolicitudes'] ?? array()) as $index => $request_item) {
+            if (is_array($request_item) && sanitize_key($request_item['id'] ?? ($request_item['formularioHabilitacionConsultorio']['consultorioSolicitudId'] ?? '')) === $request_id) {
+                $request_index = (int) $index;
+                break;
+            }
+        }
+    }
+    $message = sanitize_textarea_field((string) ($data['message'] ?? ''));
+    $active = !empty($data['active']) ? 1 : 0;
+    if (!$record_id || $message === '') return new WP_Error('invalid_suspension', 'Datos de suspensión inválidos.', array('status' => 400));
+    $path = $request_index === null ? '$.formularioHabilitacionConsultorio.suspensionAlta' : '$.consultorioSolicitudes[' . $request_index . '].formularioHabilitacionConsultorio.suspensionAlta';
+    $now = current_time('mysql', true);
+    $updated = $wpdb->query($wpdb->prepare("UPDATE " . cokifimi_dj_table_name() . " SET payload = JSON_SET(payload, %s, JSON_OBJECT('message', %s, 'createdAt', %s, 'active', %d)), updated_at = %s WHERE record_id = %s", $path, $message, $now, $active, $now, $record_id));
+    if ($updated === false) return new WP_Error('suspension_not_saved', 'No se pudo guardar la suspensión.', array('status' => 500));
+    return rest_ensure_response(array('updated' => true));
+}
 function cokifimi_dj_update_consultorio(WP_REST_Request $request) {
     global $wpdb;
     if (!current_user_can('manage_options') && !cokifimi_dj_portal_permission()) {
         return new WP_Error('forbidden', 'No tiene permisos para actualizar el Alta.', array('status' => 403));
     }
     $data = $request->get_json_params();
-    $record_id = sanitize_key($data['recordId'] ?? '');
+    $record_id = sanitize_key($data['recordId'] ?? '');    $matricula = sanitize_text_field((string) ($data['matricula'] ?? ''));
+    if ($matricula !== '') {
+        $row_by_matricula = $wpdb->get_row($wpdb->prepare('SELECT record_id FROM ' . cokifimi_dj_table_name() . ' WHERE payload LIKE %s LIMIT 1', '%' . $wpdb->esc_like($matricula) . '%'));
+        if ($row_by_matricula && !empty($row_by_matricula->record_id)) $record_id = sanitize_key($row_by_matricula->record_id);
+    }
     $incoming_form = is_array($data['formularioHabilitacionConsultorio'] ?? null) ? $data['formularioHabilitacionConsultorio'] : null;
     if (!$record_id || $incoming_form === null) return new WP_Error('invalid_consultorio', 'Datos del Alta no válidos.', array('status' => 400));
     $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . cokifimi_dj_table_name() . ' WHERE record_id = %s', $record_id));
@@ -1577,6 +2015,8 @@ function cokifimi_dj_update_consultorio(WP_REST_Request $request) {
         && !empty($merged_form['submittedAt'])
         && (($previous_form['estadoImporte'] ?? '') !== 'IMPORTE_CONFIRMADO'
             || ($previous_form['importeConfirmadoAt'] ?? '') !== ($merged_form['importeConfirmadoAt'] ?? ''));
+    $attachment_result = cokifimi_dj_store_record_data_urls($record_id, $merged_form);
+    if (is_wp_error($attachment_result)) return $attachment_result;
     $clean_form = array();
     $binary_keys = array('certificadoAnssalArchivo', 'polizaPraxisArchivo', 'planoMunicipalArchivo', 'certificadoBomberosArchivo', 'comprobantePagoArchivo', 'reciboPagoArchivo', 'certificadoUrl', 'certificadoConsultorioUrl', 'certificadoEticaUrl');
     foreach ($merged_form as $key => $value) {
@@ -1615,6 +2055,8 @@ function cokifimi_dj_update_consultorio(WP_REST_Request $request) {
     } else {
         $record['formularioHabilitacionConsultorio'] = $clean_form;
     }
+    $photo_result = cokifimi_dj_store_record_professional_photos($record_id, $record);
+    if (is_wp_error($photo_result)) return $photo_result;
     $record['updatedAt'] = current_time('mysql', true);
     $updated = $wpdb->update(cokifimi_dj_table_name(), array('payload' => wp_json_encode($record), 'updated_at' => $record['updatedAt']), array('record_id' => $record_id), array('%s', '%s'), array('%s'));
     if ($updated === false) return new WP_Error('consultorio_not_saved', 'No se pudo guardar el Alta.', array('status' => 500));
@@ -1624,8 +2066,19 @@ function cokifimi_dj_update_consultorio(WP_REST_Request $request) {
         $notification_record['consultorioSolicitudId'] = $request_id;
         wp_schedule_single_event(time() + 1, 'cokifimi_send_consultorio_amount_email', array($notification_record));
     }
-    return rest_ensure_response($record);
-}function cokifimi_dj_register_rest_routes() {
+    $response_record = cokifimi_dj_strip_embedded_files($record);
+    return rest_ensure_response($response_record);
+}function cokifimi_dj_server_time() {
+    $timezone = new DateTimeZone('America/Argentina/Buenos_Aires');
+    return rest_ensure_response(array('date' => (new DateTimeImmutable('now', $timezone))->format('Y-m-d')));
+}
+
+function cokifimi_dj_register_rest_routes() {
+    register_rest_route('cokifimi/v1', '/server-time', array(
+        'methods' => WP_REST_Server::READABLE,
+        'callback' => 'cokifimi_dj_server_time',
+        'permission_callback' => '__return_true',
+    ));
     register_rest_route('cokifimi/v1', '/auth/login', array(
         'methods' => WP_REST_Server::CREATABLE,
         'callback' => 'cokifimi_dj_portal_login',
@@ -1661,6 +2114,11 @@ function cokifimi_dj_update_consultorio(WP_REST_Request $request) {
         'callback' => 'cokifimi_dj_member_save_record',
         'permission_callback' => 'cokifimi_dj_member_permission',
     ));
+    register_rest_route('cokifimi/v1', '/member/consultorio-limited-update', array(
+        'methods' => WP_REST_Server::CREATABLE,
+        'callback' => 'cokifimi_dj_member_limited_consultorio_update',
+        'permission_callback' => 'cokifimi_dj_member_permission',
+    ));
     register_rest_route('cokifimi/v1', '/member/consultorios', array(
         'methods' => WP_REST_Server::CREATABLE,
         'callback' => 'cokifimi_dj_member_add_consultorio',
@@ -1686,6 +2144,7 @@ function cokifimi_dj_update_consultorio(WP_REST_Request $request) {
         'callback' => 'cokifimi_dj_delete_member_account',
         'permission_callback' => 'cokifimi_dj_portal_permission',
     ));
+    register_rest_route('cokifimi/v1', '/consultorio/suspension', array('methods' => WP_REST_Server::CREATABLE, 'callback' => 'cokifimi_dj_update_suspension', 'permission_callback' => 'cokifimi_dj_portal_permission'));
     register_rest_route('cokifimi/v1', '/consultorio/update', array(
         'methods' => WP_REST_Server::CREATABLE,
         'callback' => 'cokifimi_dj_update_consultorio',

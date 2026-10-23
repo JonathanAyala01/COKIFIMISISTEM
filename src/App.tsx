@@ -8,9 +8,9 @@ import DeclarationPreview from './components/DeclarationPreview';
 import DeclarationDashboard from './components/DeclarationDashboard';
 import PortalLogin from './components/PortalLogin';
 import MemberPortal from './components/MemberPortal';
-import { deleteAllConsultoriosServer, deleteConsultorioServer, deleteServerRecord, getCurrentMode, getMemberPortalVariant, isAdminMode, isMemberMode, isPortalMode, isServerConfigured, loadServerRecords, loadServerRecord, lookupServerRecord, portalLogout, saveServerRecord, updateConsultorioServer, } from './api';
+import { deleteAllConsultoriosServer, deleteConsultorioServer, deleteServerRecord, getCurrentMode, getMemberPortalVariant, isAdminMode, isMemberMode, isPortalMode, isServerConfigured, loadServerRecords, loadServerRecord, lookupServerRecord, getServerDate, portalLogout, saveServerRecord, updateConsultorioServer, } from './api';
 
-const getPhotoStorageKey = (id: string) => `cokifimi_declaration_photo_${id}`;
+const normalizeAddress = (value: unknown) => String(value ?? '')  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  .toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();const addressOf = (form: Record<string, unknown> | undefined) => normalizeAddress(  `${form?.domicilioConsultorio || ''} ${form?.numeroConsultorio || form?.numeracion || ''} ${form?.localidadConsultorio || form?.ciudad || ''}`,);const getPhotoStorageKey = (id: string) => `cokifimi_declaration_photo_${id}`;
 
 const safeSetLocalStorage = (key: string, value: string) => {
   try {
@@ -192,7 +192,7 @@ export default function App({ mode }: AppProps) {
 
   const [screen, setScreen] = useState<'dashboard' | 'form' | 'preview' | 'portal-login'>(isPortalMode() ? (hasActivePortalSession() ? 'dashboard' : 'portal-login') : (isAdminMode() ? 'dashboard' : 'form'));
   const [declarations, setDeclarations] = useState<DeclarationData[]>([]);
-  const [hiddenConsultorioRequestKeys, setHiddenConsultorioRequestKeys] = useState<string[]>([]);
+  const [hiddenConsultorioRequestKeys, setHiddenConsultorioRequestKeys] = useState<string[]>([]);  const [consultorioDeleteSuccess, setConsultorioDeleteSuccess] = useState(false);
   const [currentDeclaration, setCurrentDeclaration] = useState<DeclarationData>({ ...INITIAL_DECLARATION, fechaPresentacion: '', fechaVencimiento: '' });
   const [resetKey, setResetKey] = useState(0);
   const [portalAuthenticated, setPortalAuthenticated] = useState(() => isPortalMode() && hasActivePortalSession());
@@ -219,7 +219,7 @@ export default function App({ mode }: AppProps) {
       setSaveFeedback('idle');
     }, 3000);
     return () => window.clearTimeout(timer);
-  }, [saveFeedback]);
+  }, [saveFeedback]);  useEffect(() => {    if (!consultorioDeleteSuccess) return;    const timer = window.setTimeout(() => setConsultorioDeleteSuccess(false), 3000);    return () => window.clearTimeout(timer);  }, [consultorioDeleteSuccess]);
 
   useEffect(() => {
     if (isPortalMode() && !portalAuthenticated) return;
@@ -342,12 +342,12 @@ export default function App({ mode }: AppProps) {
     };
 
     refreshAdminRecords();
-    const refreshInterval = window.setInterval(refreshAdminRecords, 3000);
-    window.addEventListener('focus', refreshAdminRecords);
+    const refreshInterval = window.setInterval(refreshAdminRecords, 60000);
+    // No recargar todos los payloads al recuperar el foco: pueden contener adjuntos pesados.
     return () => {
       active = false;
       window.clearInterval(refreshInterval);
-      window.removeEventListener('focus', refreshAdminRecords);
+  
     };
   }, [screen, portalAuthenticated, hiddenConsultorioRequestKeys]);
 
@@ -409,7 +409,26 @@ export default function App({ mode }: AppProps) {
       return;
     }
 
-    // When editing, the photo input may be untouched and arrive empty. Keep
+    const normalizedMatricula = savedData.matricula.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+    let registeredMatricula: DeclarationData | undefined;
+    if (isServerConfigured() && normalizedMatricula) {
+      try {
+        const foundByMatricula = await lookupServerRecord(savedData.matricula);
+        if (foundByMatricula.id !== savedData.id) registeredMatricula = foundByMatricula;
+      } catch {
+        registeredMatricula = undefined;
+      }
+    } else if (normalizedMatricula) {
+      registeredMatricula = declarationsForValidation.find(declaration =>
+        declaration.id !== savedData.id &&
+        declaration.matricula.replace(/\D/g, '').replace(/^0+(?=\d)/, '') === normalizedMatricula,
+      );
+    }
+    if (!isEditingDeclaration && !isRenewingDeclaration && normalizedMatricula && registeredMatricula) {
+      setDuplicateDniRecord(registeredMatricula);
+      return;
+    }
+    const normalizedEmail = String(savedData.email || '').trim().toLowerCase();    const registeredEmail = normalizedEmail ? declarationsForValidation.find(declaration =>      declaration.id !== savedData.id && String(declaration.email || '').trim().toLowerCase() === normalizedEmail,    ) : undefined;    if (registeredEmail) {      window.alert('El correo ya está registrado en otro colegiado.');      return;    }    // When editing, the photo input may be untouched and arrive empty. Keep
     // the existing portrait so an update never overwrites it with blank data.
     const existingRecord = declarations.find(declaration => declaration.id === savedData.id);
     const existingPhoto = existingRecord ? withStoredPhoto(existingRecord).fotoUrl : '';
@@ -641,8 +660,9 @@ export default function App({ mode }: AppProps) {
       const consultorioUpdatePayload = dec.consultorioSolicitudId
         ? { ...dec, formularioHabilitacionConsultorio: { ...((dec.consultorioSolicitudes || []).find((request) => request.id === dec.consultorioSolicitudId)?.formularioHabilitacionConsultorio || {}), ...(dec.formularioHabilitacionConsultorio || {}) } }
         : dec;
-      const storedConsultorioRequests = declarations.find((item) => item.id === dec.id)?.consultorioSolicitudes || [];
-      const isExistingConsultorioRequest = Boolean(dec.consultorioSolicitudId && storedConsultorioRequests.some((request) => request.id === dec.consultorioSolicitudId));
+      // La solicitud que se está editando ya viene identificada en el registro actualizado.
+      // No depender de la copia local del listado: en altas reenviadas por rechazo puede quedar desactualizada.
+      const isExistingConsultorioRequest = Boolean(dec.consultorioSolicitudId);
       try {
         saved = isServerConfigured() ? isExistingConsultorioRequest ? await updateConsultorioServer({ ...dec, formularioHabilitacionConsultorio: consultorioUpdatePayload.formularioHabilitacionConsultorio }) : await saveServerRecord({ ...dec, consultorioSolicitudes: Array.isArray(dec.consultorioSolicitudes) ? dec.consultorioSolicitudes : [], formularioHabilitacionConsultorio: consultorioUpdatePayload.formularioHabilitacionConsultorio }) : dec;
       } catch (error) {
@@ -722,7 +742,7 @@ export default function App({ mode }: AppProps) {
         });
         safeSetLocalStorage('cokifimi_declarations', JSON.stringify(nextList.map(withoutBinaryAttachments)));
         return nextList;
-      });
+      });      setConsultorioDeleteSuccess(true);
 
     } catch (error) {
       const key = solicitudId ? `${id}:${solicitudId}` : `${id}:principal`;
@@ -800,16 +820,17 @@ export default function App({ mode }: AppProps) {
   };
 
   const handleDuplicate = async (dec: DeclarationData) => {
+    const serverToday = await getServerDate().catch(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date()));
     let duplicated: DeclarationData = {
       ...withStoredPhoto(dec),
       id: `dec_${Date.now()}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      fechaPresentacion: new Date().toISOString().split('T')[0],
-      fechaVencimiento: (() => {
-        const d = new Date();
-        return `${d.getFullYear() + 2}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      })()
+      fechaPresentacion: serverToday,
+      fechaVencimiento: (() => {
+        const [year, month, day] = serverToday.split('-').map(Number);
+        return `${year + 2}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      })()
     };
     if (isServerConfigured()) {
       try {
@@ -1031,7 +1052,7 @@ export default function App({ mode }: AppProps) {
           </div>
         </div>
       )}
-      {saveSuccessDeclaration && (
+      {consultorioDeleteSuccess && (        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[4px] print:hidden" role="status" aria-live="polite">          <div className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl">            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-[#0F5A3E]">              <CheckCircle className="h-6 w-6" />            </div>            <h2 className="mt-4 text-lg font-extrabold text-slate-900">SE ELIMINÓ ALTA CORRECTAMENTE</h2>          </div>        </div>      )}      {saveSuccessDeclaration && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[4px] print:hidden" role="dialog" aria-modal="true" aria-labelledby="save-success-title">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-start gap-3">

@@ -1,0 +1,63 @@
+import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Check, Download, LoaderCircle, X } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import logo from '@/logo.png?inline';
+import { DeclarationData } from '../types';
+import { normalizeMisionesLocality } from '../data/misionesLocalities';
+
+type Props = { declarations: DeclarationData[]; onClose: () => void };
+type Row = { d: DeclarationData; matricula: string; nombre: string; dni: string; localidad: string; consultorios: string; fechaPresentacion: string };
+const getConsultorios = (d: DeclarationData) => {
+  if (d.trabajaConsultorio !== 'SI') return [];
+  if (d.consultorios?.length) return d.consultorios;
+  if (d.domicilioConsultorio || d.numeracionConsultorio || d.ciudadConsultorio) return [{ domicilio: d.domicilioConsultorio || '', numeracion: d.numeracionConsultorio || '', ciudad: d.ciudadConsultorio || '' }];
+  return [];
+};
+const getTodayInputValue = () => { const now = new Date(); return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-'); };
+
+const rowsFor = (declarations: DeclarationData[]): Row[] => declarations.map((d) => {
+  const cs = getConsultorios(d); const local = [...new Set([...cs.map((c) => c.ciudad || ''), d.municipioLocalidad || ''].map((value) => normalizeMisionesLocality(value).trim()).filter(Boolean))]; const addresses = cs.map((c) => [c.domicilio, c.numeracion].filter(Boolean).join(' ')).filter(Boolean);
+  return { d, matricula: String(d.matricula || 'Sin matrícula'), nombre: `${d.apellido || ''}, ${d.nombres || ''}`.replace(/^,\s*|,\s*$/g, ''), dni: String(d.dni || '—'), localidad: local.join(' / ') || 'Sin localidad', consultorios: cs.length ? `${cs.length} consultorio${cs.length === 1 ? "" : "s"}${addresses.length ? " · " + addresses.join(" · ") : ""}` : 'Sin consultorio declarado', fechaPresentacion: String(d.fechaPresentacion || d.createdAt || "") };
+}).sort((a, b) => (Number.parseInt(b.matricula.replace(/\D/g, ''), 10) || 0) - (Number.parseInt(a.matricula.replace(/\D/g, ''), 10) || 0) || a.nombre.localeCompare(b.nombre, 'es'));
+
+export default function ConsultorioRosterModal({ declarations, onClose }: Props) {
+  const rows = useMemo(() => rowsFor(declarations), [declarations]);
+  const [untilDate, setUntilDate] = useState(getTodayInputValue);
+  const [rosterFilter, setRosterFilter] = useState<'all' | 'withConsultorios' | 'withoutConsultorios'>('all');
+  const filteredRows = useMemo(() => rosterFilter === 'withConsultorios' ? rows.filter((row) => getConsultorios(row.d).length > 0) : rosterFilter === 'withoutConsultorios' ? rows.filter((row) => getConsultorios(row.d).length === 0) : rows, [rows, rosterFilter]);
+  const visibleRows = useMemo(() => {
+    if (!untilDate) return filteredRows;
+    const limit = new Date(`${untilDate}T23:59:59`);
+    return filteredRows.filter((row) => {
+      const raw = row.fechaPresentacion;
+      const normalized = /^\d{2}\/\d{2}\/\d{4}$/.test(raw) ? raw.split("/").reverse().join("-") : raw.slice(0, 10);
+      const presented = new Date(`${normalized}T00:00:00`);
+      return Number.isFinite(presented.getTime()) && presented <= limit;
+    });
+  }, [filteredRows, untilDate]);
+  const visibleConsultorios = useMemo(() => visibleRows.reduce((total, row) => total + getConsultorios(row.d).length, 0), [visibleRows]);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(rows.map((r) => r.d.id)));
+  const [isDownloading, setIsDownloading] = useState(false);
+  const toggle = (id: string) => setSelected((old) => { const next = new Set(old); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const downloadPdf = async () => {
+    if (isDownloading) return;
+    const chosen = visibleRows.filter((r) => selected.has(r.d.id)); if (!chosen.length) { window.alert('Seleccione al menos un colegiado.'); return; }
+    setIsDownloading(true);
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve())); const totalConsultorios = chosen.reduce((total, row) => total + getConsultorios(row.d).length, 0);
+    try {
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' }); const widths = [78, 35, 52, 115]; const margin = 10; const pageWidth = 297;
+    const header = () => { pdf.addImage(logo, 'PNG', margin, 6, 32, 26); pdf.setTextColor(15, 90, 62); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(16); pdf.text(rosterFilter === 'withConsultorios' ? 'LISTA DE COLEGIADOS CON CONSULTORIOS' : rosterFilter === 'withoutConsultorios' ? 'LISTA DE COLEGIADOS SIN CONSULTORIO' : 'LISTA DE TODOS LOS COLEGIADOS', pageWidth / 2, 16, { align: 'center' }); pdf.setFontSize(11); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(15, 90, 62); pdf.text(`Colegiados: ${chosen.length} · Total de consultorios declarados: ${totalConsultorios}${untilDate ? ` · Declaradas hasta: ${untilDate.split("-").reverse().join("/")}` : " · Todas las declaraciones"} · Ordenada por matrícula`, pageWidth / 2, 23, { align: 'center' }); pdf.setFontSize(10); pdf.setFont('helvetica', 'normal'); pdf.text(untilDate ? 'Fecha hasta: ' + untilDate.split('-').reverse().join('/') : 'Fecha hasta: Todas las fechas', pageWidth / 2, 29, { align: 'center' }); pdf.setDrawColor(15, 90, 62); pdf.line(margin, 35, pageWidth - margin, 35); };
+    const tableHead = (y: number) => { const height = 12; let x = margin; pdf.setFillColor(15, 90, 62); pdf.rect(margin, y, pageWidth - (margin * 2), height, 'F'); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(255, 255, 255); ["Matrícula — Nombre profesional", "DNI", "Localidad", "Consultorios"].forEach((label, i) => { const lines = pdf.splitTextToSize(label, widths[i] - 4); pdf.text(lines, x + 2, y + 4.5, { lineHeightFactor: 1.05 }); if (i > 0) { pdf.setDrawColor(210, 240, 228); pdf.line(x, y, x, y + height); } x += widths[i]; }); return height; };
+    header(); let y = 40; y += tableHead(y);
+    chosen.forEach((r, index) => { const values = [`${r.matricula} — ${r.nombre}`, r.dni, r.localidad, r.consultorios]; const lines = values.map((v, i) => pdf.splitTextToSize(v, widths[i] - 4)); const height = Math.max(10, ...lines.map((line) => line.length * 3.8 + 4)); if (y + height > 190) { pdf.addPage(); header(); y = 40; y += tableHead(y); } let x = margin; pdf.setFillColor(index % 2 ? 238 : 247, 252, 247); pdf.setDrawColor(210, 230, 220); values.forEach((_v, i) => { pdf.rect(x, y, widths[i], height, 'FD'); x += widths[i]; }); x = margin; pdf.setTextColor(25, 45, 38); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); lines.forEach((line, i) => { pdf.text(line, x + 2, y + 5, { lineHeightFactor: 1.05 }); x += widths[i]; }); y += height; });
+    const pages = pdf.getNumberOfPages(); for (let p = 1; p <= pages; p += 1) { pdf.setPage(p); pdf.setFontSize(8); pdf.setTextColor(110, 125, 118); pdf.text(`COKIFIMI · Página ${p} de ${pages}`, pageWidth - margin, 202, { align: 'right' }); } pdf.save('Lista_colegiados_con_altas.pdf');
+    } catch (error) {
+      console.error('No se pudo generar la lista de altas', error);
+      window.alert('No se pudo generar el PDF. Intente nuevamente.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+  return createPortal(<div className="cokifimi-roster-modal fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true"><section className="cokifimi-roster-dialog flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"><header className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50 px-5 py-4"><div><p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">Listado administrativo</p><h2 className="text-xl font-extrabold text-slate-900">{rosterFilter === "withConsultorios" ? "Lista de colegiados con consultorios" : rosterFilter === "withoutConsultorios" ? "Lista de colegiados sin consultorio" : "Lista de todos los colegiados"}</h2><span className="text-xs text-slate-500">Seleccione los registros que desea incluir en el PDF.</span></div><button type="button" onClick={onClose} className="cokifimi-roster-close rounded-lg p-2 text-slate-500 hover:bg-white" aria-label="Cerrar"><X /></button></header><div className="cokifimi-roster-filter flex items-end justify-between gap-4 border-b border-emerald-100 bg-white px-5 py-3"><label className="flex flex-col gap-1 text-xs font-bold text-slate-600" htmlFor="cokifimi-roster-until">Declaradas hasta<input id="cokifimi-roster-until" type="date" value={untilDate} onChange={(event) => setUntilDate(event.target.value)} className="cokifimi-roster-date-input rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700" /></label><label className="flex flex-col gap-1 text-xs font-bold text-slate-600" htmlFor="cokifimi-roster-type">Listado<select id="cokifimi-roster-type" value={rosterFilter === "withConsultorios" ? "consultorios" : rosterFilter === "withoutConsultorios" ? "sin-consultorio" : "todos"} onChange={(event) => setRosterFilter(event.target.value === "consultorios" ? "withConsultorios" : event.target.value === "sin-consultorio" ? "withoutConsultorios" : "all")} className="cokifimi-roster-date-input rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700"><option value="todos">Todos los colegiados</option><option value="consultorios">Solo con consultorios</option><option value="sin-consultorio">Solo sin consultorio</option></select></label><div className="cokifimi-roster-filter-summary"><strong>{visibleRows.length} colegiados</strong><span>{visibleConsultorios} consultorios informados</span><small>{untilDate ? `Declaradas hasta ${untilDate.split("-").reverse().join("/")}` : "Todas las fechas"}</small></div></div><div className="flex items-center justify-between border-b border-slate-100 px-5 py-3 text-xs text-slate-600"><span>{visibleRows.filter((r) => selected.has(r.d.id)).length} de {visibleRows.length} seleccionados</span><button type="button" onClick={() => setSelected(visibleRows.every((r) => selected.has(r.d.id)) ? new Set([...selected].filter((id) => !visibleRows.some((r) => r.d.id === id))) : new Set([...selected, ...visibleRows.map((r) => r.d.id)]))} className="cokifimi-roster-bulk-action font-bold text-emerald-700">{visibleRows.length > 0 && visibleRows.every((r) => selected.has(r.d.id)) ? 'Descartar visibles' : 'Seleccionar visibles'}</button></div><div className="cokifimi-roster-table-scroll min-h-0 flex-1 overflow-hidden p-5"><table className="cokifimi-roster-table w-full min-w-[800px] border-collapse text-left text-xs"><thead className="sticky top-0 z-10 bg-emerald-700 text-white"><tr><th className="w-12 px-3 py-3">Incluir</th><th className="px-3 py-3">Matrícula — Nombre profesional</th><th className="px-3 py-3">DNI</th><th className="px-3 py-3">Localidad</th><th className="px-3 py-3">Consultorios</th></tr></thead><tbody>{visibleRows.map((r) => <tr key={r.d.id} className="border-b border-slate-100"><td className="px-3 py-3"><button type="button" onClick={() => toggle(r.d.id)} className={`cokifimi-roster-check flex h-5 w-5 items-center justify-center rounded border ${selected.has(r.d.id) ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-300 bg-white'}`} aria-label="Alternar inclusión" aria-pressed={selected.has(r.d.id)}>{selected.has(r.d.id) && <Check className="h-3.5 w-3.5" />}</button></td><td className="px-3 py-3 font-semibold text-slate-800">{r.matricula} — {r.nombre}</td><td className="px-3 py-3">{r.dni}</td><td className="px-3 py-3">{r.localidad}</td><td className="px-3 py-3">{r.consultorios}</td></tr>)}</tbody></table>{!visibleRows.length && <p className="py-12 text-center text-sm text-slate-500">No hay colegiados para mostrar.</p>}</div><footer className="flex justify-end gap-3 border-t border-slate-100 px-5 py-4"><button type="button" onClick={onClose} className="cokifimi-roster-cancel rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600">Cancelar</button><button type="button" onClick={downloadPdf} disabled={!visibleRows.some((r) => selected.has(r.d.id)) || isDownloading} className="cokifimi-roster-download flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{isDownloading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {isDownloading ? "Generando PDF..." : "Descargar PDF"}</button></footer></section></div>, document.body);
+}

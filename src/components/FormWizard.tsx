@@ -18,7 +18,7 @@ import {
 import { KINESIOLOGY_TITLES } from '../constants/titles';
 import { DeclarationData, ConsultorioData, MOCK_RONNY_MISHEL, INITIAL_DECLARATION } from '../types';
 import { getServerDate, lookupServerRecord } from '../api';
-const currentDateString = () => new Date().toISOString().slice(0, 10);
+const currentDateString = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date());
 
 const DEFAULT_MISIONES_CITIES = [
   "APÓSTOLES",
@@ -268,6 +268,11 @@ export default function FormWizard({ initialData, onSave, onReview, onCancel, re
   const rawTitulo = String(initialData.tituloUniversitario || "").trim();
   if (rawTitulo === "OTRO") {
     normalizedInitialData.tituloUniversitario = "";
+    initialOtro = true;
+  } else if (rawTitulo && !KINESIOLOGY_TITLES.includes(rawTitulo)) {
+    // Los títulos personalizados deben volver a abrirse con la opción OTRO
+    // seleccionada para que el campo libre participe de la validación.
+    initialOtro = true;
   }
 
   const [formData, setFormData] = useState<DeclarationData>(normalizedInitialData);
@@ -566,9 +571,10 @@ export default function FormWizard({ initialData, onSave, onReview, onCancel, re
         add(data.anssalHasta, 'ANSSAL hasta', 4);
         add(data.certificadoAnssalArchivo, 'Certificado ANSSAL adjunto', 4);
       }
-
-      const fechaInicioHabilitacion = data.fechaInicioConsultorio || (data.consultorios || []).find(c => c?.fechaInicioConsultorio)?.fechaInicioConsultorio || '';
-      add(fechaInicioHabilitacion, 'Fecha de inicio de actividad en la habilitación', 4);
+      if (data.trabajaConsultorio === 'SI') {
+        const fechaInicioHabilitacion = data.fechaInicioConsultorio || (data.consultorios || []).find(c => c?.fechaInicioConsultorio)?.fechaInicioConsultorio || '';
+        add(fechaInicioHabilitacion, 'Fecha de inicio de actividad en la habilitación', 4);
+      }
 
 
     }
@@ -1302,7 +1308,7 @@ export default function FormWizard({ initialData, onSave, onReview, onCancel, re
                   required
                   inputMode="tel"
                   minLength={8}
-                  pattern="[-0-9+() ]{8,}"
+                  pattern="(?:[0-9]|\+|\(|\)| |-){8,}"
                   title="Ingrese un número de celular válido."
                   placeholder="Ej: 3754476963"
                   value={formData.celular}
@@ -1376,7 +1382,7 @@ export default function FormWizard({ initialData, onSave, onReview, onCancel, re
                 <select
   id="tituloUniversitario"
   required
-  value={KINESIOLOGY_TITLES.includes(String(formData.tituloUniversitario || "")) ? (formData.tituloUniversitario ?? "") : ""}
+  value={otroTitulo ? "OTRO" : (KINESIOLOGY_TITLES.includes(String(formData.tituloUniversitario || "")) ? (formData.tituloUniversitario ?? "") : "")}
   onChange={e => {
     const valor = e.target.value;
 
@@ -1929,7 +1935,7 @@ export default function FormWizard({ initialData, onSave, onReview, onCancel, re
               <div className="cokifimi-bianual-attachment-content">
                 {attachmentPreview.url.startsWith("data:image/") ? (
                   <img src={attachmentPreview.url} alt={`Vista previa de ${attachmentPreview.name}`} />
-                ) : attachmentPreview.url.startsWith("data:application/pdf") ? (
+                ) : attachmentPreview.url.startsWith("data:application/pdf") || /\.pdf(?:$|[?#])/i.test(attachmentPreview.name) || /\.pdf(?:$|[?#])/i.test(attachmentPreview.url) ? (
                   <iframe src={attachmentPreview.url} title={`Vista previa de ${attachmentPreview.name}`} />
                 ) : (
                   <p>No se puede visualizar este formato dentro del formulario.</p>

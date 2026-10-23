@@ -33,6 +33,11 @@ export interface BianualAlertData {
   message: string;
   createdAt: string;
 }
+export interface ConsultorioSuspensionData {
+  message: string;
+  createdAt: string;
+  active: boolean;
+}
 
 export interface DeclarationData {
   id: string;
@@ -126,15 +131,15 @@ export interface DeclarationData {
 }
 
 const getTodayString = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
 };
 
 const getExpiryString = () => {
-  const d = new Date();
-  return `${d.getFullYear() + 2}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const [year, month, day] = getTodayString().split('-').map(Number);
+  return `${year + 2}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 };
-
 export const INITIAL_DECLARATION: DeclarationData = {
   id: '',
   createdAt: '',

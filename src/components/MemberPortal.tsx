@@ -39,6 +39,7 @@ import { normalizeMisionesLocality } from "../data/misionesLocalities";
 import {
   memberAddConsultorio,
   memberManageAttached,
+  memberUpdateConsultorioLimited,
   memberLogin,
   memberLogout,
   memberMe,
@@ -286,6 +287,7 @@ export default function MemberPortal({
     useState<DeclarationData | null>(null);
   const [newConsultorioRequestId, setNewConsultorioRequestId] = useState<string | null>(null);
   const [addingConsultorio, setAddingConsultorio] = useState(false);
+  const [limitedConsultorioEdit, setLimitedConsultorioEdit] = useState(false);
   const [newConsultorioBlockedAddresses, setNewConsultorioBlockedAddresses] = useState<string[]>([]);
   const editingExistingConsultorio = Boolean(
     newConsultorioRequestId &&
@@ -306,6 +308,7 @@ export default function MemberPortal({
   const [paymentSendingByRequest, setPaymentSendingByRequest] = useState<Record<string, boolean>>({});
   const [paymentSentByRequest, setPaymentSentByRequest] = useState<Record<string, boolean>>({});
   const [error, setError] = useState("");
+  const [saveErrorModal, setSaveErrorModal] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingAction, setLoadingAction] = useState<"login" | "code" | "">("");
   const [firstAccessHelpOpen, setFirstAccessHelpOpen] = useState(false);
@@ -342,7 +345,7 @@ export default function MemberPortal({
       } catch { /* El servidor continúa siendo la fuente principal. */ }
 
       const currentForm = record.formularioHabilitacionConsultorio || {};
-      const attachedMatriculas = ["", ...Array.from({ length: 7 }, (_, index) => String(index + 2))]
+      const attachedMatriculas = ["", ...Array.from({ length: 12 }, (_, index) => String(index + 2))]
         .map((suffix) => onlyDigits(String(currentForm["adjuntoMatricula" + suffix] || "")))
         .filter(Boolean);
 
@@ -381,7 +384,7 @@ export default function MemberPortal({
         if (!candidate.id || candidate.id === record.id) return false;
         const form = candidate.formularioHabilitacionConsultorio || {};
         if (!form.submittedAt) return false;
-        return ["", ...Array.from({ length: 7 }, (_, index) => String(index + 2))].some((suffix) =>
+        return ["", ...Array.from({ length: 12 }, (_, index) => String(index + 2))].some((suffix) =>
           onlyDigits(String(form[`adjuntoMatricula${suffix}`] || "")) === ownMatricula,
         );
       });
@@ -454,10 +457,14 @@ export default function MemberPortal({
   useEffect(() => {
     if (screen !== "consultorio") return;
     const timeout = window.setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      const editHeader = document
+        .querySelector<HTMLElement>(".cokifimi-limited-edit-location")
+        ?.closest<HTMLElement>(".cokifimi-consultorio-wizard-header");
+      if (editHeader) editHeader.scrollIntoView({ behavior: "smooth", block: "start" });
+      else window.scrollTo({ top: 0, behavior: "smooth" });
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [screen]);
+  }, [screen, limitedConsultorioEdit]);
 
 
   const removedAttachedProfessionals = attachedConsultorioRecords.filter((attached) => !isCurrentlyAdjunto(attached));
@@ -640,7 +647,33 @@ export default function MemberPortal({
   };
 
   const saveInFlightRef = useRef(false);
-  const saveRecord = async (data: DeclarationData): Promise<boolean> => {
+  const saveLimitedConsultorioUpdate = async (updates: Record<string, unknown>) => {
+    if (!record || saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
+    setError("");
+    setLoading(true);
+    try {
+      const saved = await memberUpdateConsultorioLimited(record.consultorioSolicitudId, updates);
+      if (!(saved as DeclarationData & { _limitedConsultorioUpdated?: boolean })._limitedConsultorioUpdated) {
+        throw new Error("El servidor no confirmó el reemplazo del adjunto. Debe actualizarse el archivo PHP del plugin antes de volver a intentar.");
+      }
+      try { localStorage.removeItem(`cokifimi_consultorio_adjuntos_${record.id}`); } catch { /* caché opcional */ }
+      // El servidor es la fuente de verdad: releer evita conservar en pantalla
+      // una URL heredada del archivo anterior después de reemplazarlo.
+      const refreshed = await memberMe().catch(() => saved);
+      const refreshedRecord = "record" in refreshed ? refreshed.record : refreshed;
+      setRecord(normalizeRecord((refreshedRecord || saved) as DeclarationData));
+      setLimitedConsultorioEdit(false);
+      setScreen("dashboard");
+      setMessage("Información del consultorio actualizada correctamente.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "No se pudo guardar la actualización.");
+    } finally {
+      saveInFlightRef.current = false;
+      setLoading(false);
+    }
+  };
+  const saveRecord = async (data: DeclarationData, successMessage?: string): Promise<boolean> => {
     if (saveInFlightRef.current) return false;
     saveInFlightRef.current = true;
     setError("");
@@ -671,15 +704,15 @@ export default function MemberPortal({
         setUpdatedModalMode(sendingLibreDeuda ? "libre-deuda" : "updated");
         setShowUpdatedModal(true);
       } else {
-        setMessage("Sus datos fueron actualizados y enviados a administración.");
+        setMessage(successMessage || "Sus datos fueron actualizados y enviados a administración.");
       }
       return true;
     } catch (saveError) {
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : "No se pudo guardar la actualización.",
-      );
+      const message = saveError instanceof Error
+        ? saveError.message
+        : "No se pudo guardar la actualización.";
+      setError(message);
+      setSaveErrorModal(message);
     } finally {
       saveInFlightRef.current = false;
       setLoading(false);
@@ -781,7 +814,7 @@ export default function MemberPortal({
       const targetForm = consultorioSolicitudId
         ? record.consultorioSolicitudes?.find((request) => request.id === consultorioSolicitudId)?.formularioHabilitacionConsultorio
         : record.formularioHabilitacionConsultorio;
-      const associatedMatriculas = ["", ...Array.from({ length: 7 }, (_, index) => String(index + 2))]
+      const associatedMatriculas = ["", ...Array.from({ length: 12 }, (_, index) => String(index + 2))]
         .map((suffix) => onlyDigits(String(targetForm?.[`adjuntoMatricula${suffix}`] || "")))
         .filter(Boolean);
       if (associatedMatriculas.includes(normalizedMatricula)) {
@@ -905,7 +938,7 @@ export default function MemberPortal({
           record?.cantidadConsultorios || 0,
         )
       : 0;
-  const getAttachedProfessionalsForForm = (form: Record<string, string | boolean | undefined | unknown[]>) => ["", ...Array.from({ length: 7 }, (_, index) => String(index + 2))].map((suffix) => {
+  const getAttachedProfessionalsForForm = (form: Record<string, string | boolean | undefined | unknown[]>) => ["", ...Array.from({ length: 12 }, (_, index) => String(index + 2))].map((suffix) => {
     const matricula = String(form[`adjuntoMatricula${suffix}`] || "").trim();
     if (!matricula) return null;
     return {
@@ -927,11 +960,11 @@ export default function MemberPortal({
     const attachedActionError = attachedActionErrorByRequest[requestKey] || "";
     return (
       <section className="cokifimi-attached-professionals cokifimi-member-attached-professionals" aria-label="Profesionales adjuntos a cargo">
-        <small>Profesionales adjuntos asociados · {attached.length}/8</small>
+        <small>Profesionales adjuntos asociados · {attached.length}/13</small>
         {attachedActionError && <div className="cokifimi-member-attached-error" role="alert">{attachedActionError}</div>}
         <div className="cokifimi-attached-professionals-manage">
           <input value={search} onChange={(event) => setAttachedSearchByRequest((current) => ({ ...current, [requestKey]: event.target.value }))} inputMode="text" placeholder="ID, DNI o matrícula del adjunto" aria-label="ID, DNI o matrícula del profesional adjunto" />
-          <button type="button" disabled={Boolean(attachedActionLoading) || !search.trim() || attached.length >= 8} onClick={() => void manageAttachedProfessional("associate", search, requestId)}>
+          <button type="button" disabled={Boolean(attachedActionLoading) || !search.trim() || attached.length >= 13} onClick={() => void manageAttachedProfessional("associate", search, requestId)}>
             {attachedActionLoading === `associate:${requestKey}:${onlyDigits(search)}` ? <LoaderCircle className="animate-spin" /> : <Link2 />} Asociar profesional
           </button>
         </div>
@@ -988,6 +1021,8 @@ export default function MemberPortal({
     ? rawLibreDeudaSolicitud
     : undefined;
   const trabajaEnConsultorio = record?.trabajaConsultorio === "SI";
+  const esColegiadoTitular = Boolean(record && isTitularRecord(record));
+  const puedeGestionarConsultorio = trabajaEnConsultorio && esColegiadoTitular;
   // Todo colegiado con acceso confirmado puede solicitar Libre Deuda.
   // La disponibilidad no depende de fechas históricas de la declaración bianual.
   const libreDeudaPuedeSolicitar = Boolean(record);
@@ -1108,7 +1143,10 @@ export default function MemberPortal({
   const consultorioReceiptName =
     record?.formularioHabilitacionConsultorio?.reciboPagoNombre;
   const consultorioForm = record?.formularioHabilitacionConsultorio || {};
-  const consultorioRequestedLocation = [
+    const consultorioSuspension = consultorioForm.suspensionAlta && typeof consultorioForm.suspensionAlta === "object"
+    ? consultorioForm.suspensionAlta as { message?: unknown; active?: unknown }
+    : null;
+const consultorioRequestedLocation = [
     consultorioForm.domicilioConsultorio,
     consultorioForm.numeroConsultorio,
     consultorioForm.localidadConsultorio,
@@ -1246,7 +1284,7 @@ export default function MemberPortal({
             setPendingRecord(null);
             setScreen("dashboard");
           }}
-          readOnlyDates={false}
+          readOnlyDates
           memberInfoOnly={Boolean(record && !record.memberProvisional)}
           lockedEmail
           showMatriculationAdminNotice
@@ -1270,6 +1308,18 @@ export default function MemberPortal({
         }}
         backLabel="Inicio del panel"
       />
+        {saveErrorModal && (
+          <div className="cokifimi-member-modal-backdrop" role="presentation" onClick={() => setSaveErrorModal(null)}>
+            <section className="cokifimi-member-first-access-modal cokifimi-member-save-error-modal" role="dialog" aria-modal="true" aria-labelledby="member-save-error-title" onClick={(event) => event.stopPropagation()}>
+              <button type="button" className="cokifimi-member-modal-close" onClick={() => setSaveErrorModal(null)} aria-label="Cerrar aviso">×</button>
+              <div className="cokifimi-member-save-error-icon"><AlertTriangle /></div>
+              <p className="cokifimi-member-save-error-kicker">No se guardaron los cambios</p>
+              <h2 id="member-save-error-title">No se puede completar la operación</h2>
+              <p>{saveErrorModal}</p>
+              <button type="button" className="cokifimi-member-modal-confirm" onClick={() => setSaveErrorModal(null)}>Entendido</button>
+            </section>
+          </div>
+        )}
       </div>
     );
   const primaryConsultorioRejected = Boolean(
@@ -1369,10 +1419,13 @@ export default function MemberPortal({
           setConsultorio(EMPTY_CONSULTORIO);
           setNewConsultorioRequestId(null);
           setAddingConsultorio(false);
+          setLimitedConsultorioEdit(false);
           setNewConsultorioBlockedAddresses([]);
           setScreen("dashboard");
         }}
         saving={loading}
+        limitedEdit={limitedConsultorioEdit}
+        onLimitedSave={(updates) => void saveLimitedConsultorioUpdate(updates)}
         forceNewConsultorio={addingConsultorio}
       />
     );
@@ -1704,6 +1757,19 @@ export default function MemberPortal({
               <h2 id="member-updated-title" className="mt-4 text-xl font-extrabold text-slate-900">{updatedModalMode === "libre-deuda" ? "Enviado" : "Actualizado"}</h2>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">{updatedModalMode === "libre-deuda" ? "Su pedido de Libre Deuda fue enviado correctamente. Podrá consultar el estado desde este panel." : "La información fue actualizada correctamente. Volviendo al panel de Formulario 1."}</p>
             </div>
+          </div>
+        )}
+
+        {saveErrorModal && (
+          <div className="cokifimi-member-modal-backdrop" role="presentation" onClick={() => setSaveErrorModal(null)}>
+            <section className="cokifimi-member-first-access-modal cokifimi-member-save-error-modal" role="dialog" aria-modal="true" aria-labelledby="member-save-error-title" onClick={(event) => event.stopPropagation()}>
+              <button type="button" className="cokifimi-member-modal-close" onClick={() => setSaveErrorModal(null)} aria-label="Cerrar aviso">×</button>
+              <div className="cokifimi-member-save-error-icon"><AlertTriangle /></div>
+              <p className="cokifimi-member-save-error-kicker">No se guardaron los cambios</p>
+              <h2 id="member-save-error-title">No se puede completar la operación</h2>
+              <p>{saveErrorModal}</p>
+              <button type="button" className="cokifimi-member-modal-confirm" onClick={() => setSaveErrorModal(null)}>Entendido</button>
+            </section>
           </div>
         )}
 
@@ -2273,6 +2339,7 @@ export default function MemberPortal({
                     </div>
                   </div>                  {renderAttachedManager({ id: "principal", formularioHabilitacionConsultorio: record.formularioHabilitacionConsultorio })}
                 </div>
+                {consultorioSuspension?.active && <section className="cokifimi-member-bianual-alert" role="alert" aria-live="polite"><div className="cokifimi-member-bianual-alert-icon"><BellRing /></div><div><strong>ALTA DE CONSULTORIO SUSPENDIDA</strong><p>{String(consultorioSuspension.message || "La Administración suspendió esta alta de consultorio.")}</p><small>Revise el motivo indicado y comuníquese con la Administración si necesita regularizarla.</small></div></section>}
                 {consultorioProgress}
                 {consultorioPaymentPanel}
                 {consultorioValidityPanel}
@@ -2282,6 +2349,12 @@ export default function MemberPortal({
                     onClick={() => { setRecord({ ...record!, consultorioSolicitudId: undefined }); setScreen("consultorio-view"); }}
                   >
                     <CalendarDays /> VER MI HABILITACIÓN DE CONSULTORIO
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setRecord({ ...record!, consultorioSolicitudId: undefined }); setLimitedConsultorioEdit(true); setScreen("consultorio"); }}
+                  >
+                    <FilePenLine /> EDITAR MI CONSULTORIO
                   </button>
                 </div>
                 <div
@@ -2354,6 +2427,9 @@ export default function MemberPortal({
               const receiptUrl = typeof form.reciboPagoArchivo === "string" ? form.reciboPagoArchivo : "";
               const receiptName = typeof form.reciboPagoNombre === "string" ? form.reciboPagoNombre : "recibo-de-pago";
               const requestKey = request.id;
+              const suspension = form.suspensionAlta && typeof form.suspensionAlta === "object"
+                ? form.suspensionAlta as { message?: unknown; active?: unknown }
+                : null;
               return (
                 <section key={requestKey} className="cokifimi-member-consultorio-submission cokifimi-member-consultorio-submission-additional" aria-label={`Seguimiento del Alta ${requestIndex + 2}`}>
                   <div className="cokifimi-member-current-form-label cokifimi-member-consultorio-presented-label">
@@ -2370,6 +2446,7 @@ export default function MemberPortal({
                     </div>
                     {renderAttachedManager(request)}
                   </div>
+                  {suspension?.active && <section className="cokifimi-member-bianual-alert" role="alert" aria-live="polite"><div className="cokifimi-member-bianual-alert-icon"><BellRing /></div><div><strong>ALTA DE CONSULTORIO SUSPENDIDA</strong><p>{String(suspension.message || "La Administración suspendió esta alta de consultorio.")}</p><small>Revise el motivo indicado y comuníquese con la Administración si necesita regularizarla.</small></div></section>}
                   <div className={`cokifimi-member-consultorio-progress ${rejected ? "is-rejected" : validated ? "is-approved" : ""}`}>
                     <div className="cokifimi-member-consultorio-progress-heading"><strong>Seguimiento del trámite</strong><span>{status}</span></div>
                     <div className="cokifimi-member-consultorio-progress-steps">
@@ -2476,7 +2553,7 @@ export default function MemberPortal({
                       <div><CalendarDays /><span>Vencimiento</span><strong>{formatDateOnly(validityTo)}</strong></div>
                       <div className="is-highlight"><CalendarDays /><span>Vigencia</span><strong>{validityDays !== null && validityDays < 0 ? "Vencida" : `${validityDays} días restantes`}</strong></div>
                     </div>
-                  <div className="cokifimi-member-actions"><button type="button" onClick={() => { setRecord({ ...record!, consultorioSolicitudId: request.id, formularioHabilitacionConsultorio: { ...form, consultorioSolicitudId: request.id } }); setScreen("consultorio-view"); }}><CalendarDays /> VER MI HABILITACIÓN DE CONSULTORIO</button></div>
+                  <div className="cokifimi-member-actions"><button type="button" onClick={() => { setRecord({ ...record!, consultorioSolicitudId: request.id, formularioHabilitacionConsultorio: { ...form, consultorioSolicitudId: request.id } }); setScreen("consultorio-view"); }}><CalendarDays /> VER MI HABILITACIÓN DE CONSULTORIO</button><button type="button" onClick={() => { setRecord({ ...record!, consultorioSolicitudId: request.id, formularioHabilitacionConsultorio: { ...form, consultorioSolicitudId: request.id } }); setLimitedConsultorioEdit(true); setScreen("consultorio"); }}><FilePenLine /> EDITAR MI CONSULTORIO</button></div>
                     <div className="cokifimi-member-consultorio-validation is-validated">
                       <CheckCircle2 />
                       <div>
@@ -2603,13 +2680,13 @@ export default function MemberPortal({
                 </button>
                 </div>
               </article>
-              <article className={`cokifimi-member-form-card ${trabajaEnConsultorio ? "is-active" : "is-upcoming is-consultorio-blocked"} is-formulario-2`}>
+              <article className={`cokifimi-member-form-card ${puedeGestionarConsultorio ? "is-active" : "is-upcoming is-consultorio-blocked"} is-formulario-2`}>
                 <div className="cokifimi-member-form-card-icon"><Stethoscope /></div>
                 <span className={`cokifimi-member-form-card-kicker ${consultorioSubmittedAt ? "is-presented" : ""}`}>
-                  {consultorioSubmittedAt && <CheckCircle2 />} FORMULARIO 2 · {consultorioSubmittedAt ? "PRESENTADO" : trabajaEnConsultorio ? "DISPONIBLE" : "BLOQUEADO"}
+                  {consultorioSubmittedAt && <CheckCircle2 />} FORMULARIO 2 · {consultorioSubmittedAt ? "PRESENTADO" : puedeGestionarConsultorio ? "DISPONIBLE" : "BLOQUEADO"}
                 </span>
                 <h3>Alta de consultorio / área kinésica</h3>
-                <p>{trabajaEnConsultorio ? "Informe un nuevo lugar de atención para enviarlo a revisión de administración." : "No disponible porque declaró que no trabaja en consultorio / área kinésica."}</p>
+                <p>{puedeGestionarConsultorio ? "Informe un nuevo lugar de atención para enviarlo a revisión de administración." : "SOLO PARA COLEGIADO TITULAR"}</p>
                 {consultorioSubmittedAt ? sortedConsultorioRequests.map((request) => {
                   const requestForm = request.formularioHabilitacionConsultorio || {};
                   const requestLocation = [requestForm.domicilioConsultorio, requestForm.numeroConsultorio, requestForm.localidadConsultorio].filter(Boolean).join(" ");
@@ -2621,14 +2698,14 @@ export default function MemberPortal({
                     <CalendarDays />
                     <span className="cokifimi-member-form-card-button-content"><strong>Ver solicitud y adjuntos</strong><small>{requestLocation || "Ubicación no informada"}</small></span>
                   </button>;
-                }) : <button type="button" disabled={!trabajaEnConsultorio} onClick={() => {
+                }) : <button type="button" disabled={!puedeGestionarConsultorio} onClick={() => {
                   setConsultorio(EMPTY_CONSULTORIO);
                   setScreen("consultorio");
                 }}>
                   <Building2 />
-                  <span className="cokifimi-member-form-card-button-content"><strong>{!trabajaEnConsultorio ? "Alta no disponible" : "Dar de alta o actualizar mi Consultorio"}</strong></span>
+                  <span className="cokifimi-member-form-card-button-content"><strong>{!puedeGestionarConsultorio ? "SOLO PARA COLEGIADO TITULAR" : "Dar de alta o actualizar mi Consultorio"}</strong></span>
                 </button>}
-                {consultorioSubmittedAt && trabajaEnConsultorio && canRequestAnotherConsultorio && <div className="cokifimi-member-additional-consultorio-requests">
+                {consultorioSubmittedAt && puedeGestionarConsultorio && canRequestAnotherConsultorio && <div className="cokifimi-member-additional-consultorio-requests">
                   <strong>Más consultorios particulares</strong>
                   <button type="button" className="cokifimi-member-new-consultorio-button" onClick={() => {
                     setNewConsultorioBlockedAddresses(consultorioRequests.map((request) => { const form = request.formularioHabilitacionConsultorio || {}; return `${form.domicilioConsultorio || ""} ${form.numeroConsultorio || ""} ${form.localidadConsultorio || ""}`.trim(); }).filter(Boolean));

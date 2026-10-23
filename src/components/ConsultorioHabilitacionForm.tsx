@@ -12,6 +12,9 @@ import {
   Download,
   Edit,
   Eye,
+  FileText,
+  FileUp,
+  MapPin,
   Save,
   Send,
   UserRound,
@@ -40,7 +43,7 @@ const yesNo = ["SI", "NO"];
 // Por ahora las altas están habilitadas únicamente para consultorios particulares.
 const CONSULTORIO_AREA_OPTIONS = [
   "Consultorio particular (un titular)",
-  ...Array.from({ length: 8 }, (_, index) => {
+  ...Array.from({ length: 13 }, (_, index) => {
     const count = index + 1;
     return `Consultorio particular (un titular y ${count === 1 ? "un" : count} adjunto${count === 1 ? "" : "s"})`;
   }),
@@ -51,7 +54,7 @@ const CONSULTORIO_AREA_OPTIONS = [
 ];
 // Etiquetas explícitas donde el nombre derivado de la clave no alcanza.
 const getAdjuntoCount = (area: string) => {
-  const match = String(area || "").match(/\b(un|dos|[1-8])\s+adjuntos?\b/i);
+  const match = String(area || "").match(/\b(un|dos|[1-9]|1[0-3])\s+adjuntos?\b/i);
   if (!match) return 0;
   const value = match[1].toLowerCase();
   return value === "un" ? 1 : value === "dos" ? 2 : Number(value);
@@ -75,17 +78,21 @@ const CONSULTORIO_LOCALITIES = MISIONES_LOCALITY_POSTAL_BY_NAME;
 export default function ConsultorioHabilitacionForm({
   record,
   onReview,
+  onLimitedSave,
   onCancel,
   saving,
   adminEdit = false,
+  limitedEdit = false,
   forceNewConsultorio = false,
   excludedConsultorioAddresses = [],
 }: {
   record: DeclarationData;
   onReview: (data: DeclarationData) => void;
+  onLimitedSave?: (updates: Record<string, unknown>) => void;
   onCancel: () => void;
   saving: boolean;
   adminEdit?: boolean;
+  limitedEdit?: boolean;
   forceNewConsultorio?: boolean;
   excludedConsultorioAddresses?: string[];
 }) {
@@ -178,14 +185,7 @@ export default function ConsultorioHabilitacionForm({
       for (const child of Object.values(source)) { const found = find(child); if (found) return found; }
       return '';
     };
-    const fromRecord = find(record);
-    if (fromRecord) return fromRecord;
-    try {
-      const stored = JSON.parse(localStorage.getItem("cokifimi_consultorio_adjuntos_" + record.id) || '{}');
-      return find(stored);
-    } catch {
-      return '';
-    }
+    return find(record);
   };
   const preserveCurrentConsultorio = Boolean(currentRequest) || previous.estadoAdmin === "RECHAZADO" || Boolean(adminEdit && previous.domicilioConsultorio);
   const currentAltaAddressKey = preserveCurrentConsultorio
@@ -268,6 +268,7 @@ export default function ConsultorioHabilitacionForm({
       localidadConsultorio: "",
     }),
   }));
+  const [uploadingDocument, setUploadingDocument] = useState(false);
   const [adjuntoSearchByOrdinal, setAdjuntoSearchByOrdinal] = useState<Record<number, string>>((): Record<number, string> => (adminEdit ? { 1: "", 2: "" } : {}));
   useEffect(() => {
     document
@@ -362,7 +363,7 @@ export default function ConsultorioHabilitacionForm({
         const next: ConsultorioFormValues = { ...current, [key]: value, adjuntoIncluido: adjuntoCount > 0 ? "SI" : "NO" };
         Object.keys(next).forEach((fieldKey) => {
           const isAdjuntoField = /^(?:adjunto(?!Incluido)|certificado(?:Anssal|Praxis).*Adjunto|polizaPraxisArchivoAdjunto)/i.test(fieldKey);
-          const adjuntoOrdinal = Number(fieldKey.match(/([2-8])$/)?.[1] || 1);
+          const adjuntoOrdinal = Number(fieldKey.match(/(1[0-3]|[2-9])$/)?.[1] || 1);
           if (isAdjuntoField && (adjuntoCount === 0 || adjuntoOrdinal > adjuntoCount)) next[fieldKey] = "";
         });
         setAdjuntoSearchByOrdinal((currentSearch) => Object.fromEntries(
@@ -378,7 +379,7 @@ export default function ConsultorioHabilitacionForm({
     });
   };
   const isSystemFilledAdjuntoField = (key: string) =>
-    /^adjunto(?:Titulo|Apellido|Nombres|Dni|Cuil|ObrasSociales|Anssal|AnssalDesde|AnssalHasta|CompaniaSeguro|PolizaSeguro|SeguroDesde|SeguroHasta|InicioActividad|Asociado)(?:[2-8])?$/.test(key);
+    /^adjunto(?:Titulo|Apellido|Nombres|Dni|Cuil|ObrasSociales|Anssal|AnssalDesde|AnssalHasta|CompaniaSeguro|PolizaSeguro|SeguroDesde|SeguroHasta|InicioActividad|Asociado)(?:[2-9]|1[0-3])?$/.test(key);
   // El tipo de área kinésica define si hay declaración jurada del adjunto.
   const tipoArea = String(data.tipoArea || "");
   const adjuntosDeclarados = getAdjuntoCount(tipoArea);
@@ -834,7 +835,7 @@ export default function ConsultorioHabilitacionForm({
         return;
       }
       const selectedMatricula = normalizeMatricula(String(valueFromRecord(activeMatch, ["matricula"]) || matricula));
-      const alreadyLoaded = ["", ...Array.from({ length: 7 }, (_, index) => String(index + 2))]
+      const alreadyLoaded = ["", ...Array.from({ length: 12 }, (_, index) => String(index + 2))]
         .filter((existingOrdinal) => existingOrdinal !== (ordinal > 1 ? String(ordinal) : ""))
         .some((existingOrdinal) => matriculasCoinciden(String(data[`adjuntoMatricula${existingOrdinal}`] || ""), selectedMatricula));
       if (alreadyLoaded) {
@@ -1045,6 +1046,11 @@ export default function ConsultorioHabilitacionForm({
   const visibleRequiredDocuments = requiredDocuments;
   const uploadDocument = (key: string, file?: File) => {
     if (!file) return;
+    if (key === "planoMunicipalArchivo" && (!/\.pdf$/i.test(file.name) || (file.type && file.type !== "application/pdf"))) {
+      window.alert("Solo se puede subir archivo en formato PDF.");
+      return;
+    }
+    setUploadingDocument(true);
     const reader = new FileReader();
     reader.onload = () => {
       const content = String(reader.result || "");
@@ -1053,17 +1059,9 @@ export default function ConsultorioHabilitacionForm({
         [key]: content,
         [`${key}Nombre`]: file.name,
       }));
-      const storageKey = `cokifimi_consultorio_adjuntos_${record.id}`;
-      const stored = JSON.parse(localStorage.getItem(storageKey) || "{}");
-      localStorage.setItem(
-        storageKey,
-        JSON.stringify({
-          ...stored,
-          [key]: content,
-          [`${key}Nombre`]: file.name,
-        }),
-      );
+      setUploadingDocument(false);
     };
+    reader.onerror = () => setUploadingDocument(false);
     reader.readAsDataURL(file);
   };
   const section = (title: string, children: ReactNode, note?: string) => (
@@ -1085,11 +1083,14 @@ export default function ConsultorioHabilitacionForm({
           {label}
           <input
             type="file"
-            accept=".pdf,.jpg,.jpeg,.png"
+            accept={key === "planoMunicipalArchivo" ? ".pdf,application/pdf" : ".pdf,.jpg,.jpeg,.png"}
             required={!OPTIONAL_DOCUMENTS.includes(key) && !data[key]}
             onChange={(event) => uploadDocument(key, event.target.files?.[0])}
           />
-          {data[key] && <small className="cokifimi-consultorio-inherited-document"><CheckCircle2 size={15} aria-hidden="true" /> Archivo cargado</small>}
+          {key === "planoMunicipalArchivo" && (
+            <small className="cokifimi-document-format-note">Obligatorio: debe adjuntar unicamente un archivo PDF.</small>
+          )}
+          {data[key] && <small className={`cokifimi-consultorio-inherited-document ${key === "planoMunicipalArchivo" || key === "certificadoBomberosArchivo" ? "cokifimi-required-document-loaded" : ""}`}><CheckCircle2 size={15} aria-hidden="true" /> Archivo cargado</small>}
         </label>
       ))}
 
@@ -1404,6 +1405,46 @@ export default function ConsultorioHabilitacionForm({
         }}
         backLabel="Volver al formulario"
       />
+    );
+  }
+
+  if (limitedEdit) {
+    const editingLocation = [previous.domicilioConsultorio, previous.numeroConsultorio, previous.localidadConsultorio].filter(Boolean).join(" · ") || "Ubicación no informada";
+    const editableChecks = [
+      "puertasIngresoAdaptadas", "puertasInternasAdaptadas", "rampas", "escaleras", "escalerasPasamanos", "ascensor",
+      "instalacionElectrica", "descargaTierra", "sistemaTrifasico", "disyuntor", "alarmaHumo", "salidaEmergencia",
+      "aireConsultorio", "ventilacionPasivaConsultorio", "ventilacionForzadaConsultorio", "boxes",
+      "aireEspera", "ventilacionPasivaEspera", "ventilacionForzadaEspera", "bano", "inodoro", "lavatorio",
+      "aguaCaliente", "ducha", "banoAdaptado", "gimnasioTerapeutico", "gimnasioDeportivo",
+    ];
+    const replaceDocument = (key: "planoMunicipalArchivo" | "certificadoBomberosArchivo", label: string) => {
+      const loaded = Boolean(data[key]);
+      const name = String(data[`${key}Nombre`] || "");
+      const format = key === "planoMunicipalArchivo" ? "PDF obligatorio" : "PDF, JPG o PNG";
+      return <article key={key} className={`cokifimi-limited-document-card ${loaded ? "is-loaded" : ""}`}>
+        <div className="cokifimi-limited-document-card-heading"><FileText aria-hidden="true" /><div><strong>{label}</strong><span>{format}</span></div></div>
+        <p className="cokifimi-limited-document-status">{uploadingDocument ? "Procesando el archivo seleccionado…" : loaded ? `Archivo actual: ${name || "cargado"}` : "Todavía no hay un archivo cargado."}</p>
+        <label className="cokifimi-limited-document-upload"><FileUp aria-hidden="true" /> {loaded ? "Reemplazar archivo" : "Seleccionar archivo"}<input type="file" accept={key === "planoMunicipalArchivo" ? ".pdf,application/pdf" : ".pdf,.jpg,.jpeg,.png"} onChange={(event) => uploadDocument(key, event.target.files?.[0])} /></label>
+        <small>{loaded ? "El archivo actual se conservará hasta que guarde el reemplazo." : "Puede cargarlo ahora o hacerlo más adelante."}</small>
+      </article>;
+    };
+    return (
+      <section className="cokifimi-member-form-shell cokifimi-consultorio-form-shell">
+        <div className="cokifimi-member-form-return"><button type="button" onClick={onCancel}><ArrowLeft /> Volver al panel del colegiado</button></div>
+        <form className="cokifimi-consultorio-form" onSubmit={(event) => {
+          event.preventDefault();
+          const editableKeys = [...editableChecks, "planoMunicipalArchivo", "planoMunicipalArchivoNombre", "certificadoBomberosArchivo", "certificadoBomberosArchivoNombre"];
+          const updates = Object.fromEntries(editableKeys.map((key) => [key, data[key]]));
+          if (onLimitedSave) onLimitedSave(updates);
+          else onReview({ ...record, formularioHabilitacionConsultorio: { ...previous, ...updates } });
+        }}>
+          <header className="cokifimi-consultorio-wizard-header"><Edit /><div><span>HABILITACIÓN DE CONSULTORIO</span><h1>Editar mi consultorio</h1><p>Solo puede actualizar las opciones de instalaciones y reemplazar el plano o certificado de bomberos.</p><div className="cokifimi-limited-edit-location"><MapPin aria-hidden="true" /><span>Editando la habilitación de: <strong>{editingLocation}</strong></span></div></div></header>
+          {section("Instalaciones del consultorio", editableChecks.slice(0, 16).map((key) => select(CONSULTORIO_FIELD_LABELS[key] || key.replace(/([A-Z])/g, " $1"), key)))}
+          {section("Sala de espera", editableChecks.slice(16).map((key) => select(CONSULTORIO_FIELD_LABELS[key] || key.replace(/([A-Z])/g, " $1"), key)))}
+          <section className="cokifimi-limited-documents"><div className="cokifimi-limited-documents-title"><h2>Archivos adjuntos</h2><p>Reemplace un documento únicamente si tiene una versión nueva.</p></div><div className="cokifimi-limited-documents-grid">{replaceDocument("planoMunicipalArchivo", "Plano edilicio habilitado y aprobado por la Municipalidad")}{replaceDocument("certificadoBomberosArchivo", "Certificado de bomberos vigente")}</div></section>
+          <footer className="cokifimi-consultorio-actions"><button type="submit" disabled={saving || uploadingDocument}><Save /> {uploadingDocument ? "Procesando archivo…" : "Guardar cambios"}</button></footer>
+        </form>
+      </section>
     );
   }
 
@@ -1807,7 +1848,7 @@ export function ConsultorioHabilitacionPreview({
     };
     return find(data);
   };  // También contemplar asociaciones agregadas posteriormente desde el panel del titular.
-  const adjuntosPreview = Array.from({ length: 8 }, (_, index) => index + 1)
+  const adjuntosPreview = Array.from({ length: 13 }, (_, index) => index + 1)
     .filter((ordinal) => Boolean(String(values[`adjuntoMatricula${ordinal > 1 ? ordinal : ""}`] || "").trim()));
     const getAdjuntoPhoto = (ordinal: number) => {
     const suffix = ordinal > 1 ? String(ordinal) : "";
@@ -1979,9 +2020,14 @@ export function ConsultorioHabilitacionPreview({
       const storedAttachments: Record<string, any> = JSON.parse(
         localStorage.getItem(storageKey) || "{}",
       );
+      const displayedLabels = new Set<string>();
       attachments.forEach(([key, label]) => {
         const file = (values as any)[key] || (data as any)[key] || storedAttachments[key];
         if (typeof file !== "string" || !file.trim()) return;
+        // Archivo is evaluated before its legacy Url counterpart. Once a document
+        // is found, do not render the previous version as a second attachment.
+        if (displayedLabels.has(label)) return;
+        displayedLabels.add(label);
         const button = document.createElement("button");
         button.type = "button";
         button.textContent = `Ver ${label}`;
@@ -2044,14 +2090,19 @@ export function ConsultorioHabilitacionPreview({
     ["certificadoBomberosUrl", "Certificado de bomberos"],
     ["comprobantePagoArchivo", "Comprobante de pago"],
     ["comprobantePagoUrl", "Comprobante de pago"],
-    ["certificadoAnssalArchivoAdjunto", "Certificado ANSSAL · adjunto 1"],
-    ["polizaPraxisArchivoAdjunto", "Póliza de praxis · adjunto 1"],
-    ["certificadoAnssalArchivoAdjunto2", "Certificado ANSSAL · adjunto 2"],
-    ["polizaPraxisArchivoAdjunto2", "Póliza de praxis · adjunto 2"],
+    ...Array.from({ length: 13 }, (_, index) => {
+      const ordinal = index + 1;
+      const suffix = ordinal === 1 ? "" : String(ordinal);
+      return [
+        [`certificadoAnssalArchivoAdjunto${suffix}`, `Certificado ANSSAL · adjunto ${ordinal}`],
+        [`polizaPraxisArchivoAdjunto${suffix}`, `Póliza de praxis · adjunto ${ordinal}`],
+      ] as Array<[string, string]>;
+    }).flat(),
   ];
   const headerAttachments = attachmentCandidates
     .map(([key, label]) => [getDocumentValue(String(key)), label] as [string, string])
-    .filter(([file]) => Boolean(file.trim()));
+    .filter(([file]) => Boolean(file.trim()))
+    .filter(([, label], index, items) => items.findIndex(([, candidateLabel]) => candidateLabel === label) === index);
   return (
     <div
       className="cokifimi-preview-modal max-w-6xl mx-auto space-y-8"

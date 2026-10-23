@@ -1109,7 +1109,6 @@ select, input[type="text"], input[type="date"], input[type="tel"] {
 .cokifimi-wordpress-shell .cokifimi-admin-portal .cokifimi-login-security svg { color: #6ee7b7; height: 17px; width: 17px; }
 .cokifimi-wordpress-shell .cokifimi-admin-portal .cokifimi-login-lines { bottom: -40px; opacity: 0.14; position: absolute; right: -48px; transform: rotate(-22deg); }
 .cokifimi-wordpress-shell .cokifimi-admin-portal .cokifimi-login-lines span { border: 1px solid #ffffff; border-radius: 9999px; display: block; height: 130px; margin: 12px; width: 230px; }
-
 .cokifimi-wordpress-shell .cokifimi-admin-portal .cokifimi-login-form { display: flex; flex-direction: column; justify-content: center; padding: 48px 52px; }
 .cokifimi-wordpress-shell .cokifimi-admin-portal .cokifimi-login-form-heading p { color: #0f5a3e !important; font-size: 10px !important; font-weight: 800 !important; letter-spacing: 0.13em; margin: 0 !important; }
 .cokifimi-wordpress-shell .cokifimi-admin-portal .cokifimi-login-form-heading h2 { color: #16352b !important; font-size: 26px !important; font-weight: 800 !important; letter-spacing: -0.025em; line-height: 1.15 !important; margin: 8px 0 !important; }
@@ -1756,6 +1755,11 @@ select, input[type="text"], input[type="date"], input[type="tel"] {
 .cokifimi-member-expiry-dashboard { display: grid; gap: 10px; grid-template-columns: repeat(3, 1fr); margin: -10px 0 25px; }.cokifimi-member-expiry-card { align-items: flex-start; background: #f8fffb; border: 1px solid #d9eee2; border-radius: 13px; color: #316052; display: flex; flex-direction: column; gap: 6px; min-height: 112px; padding: 14px; }.cokifimi-member-expiry-card svg { background: #dcfce7; border-radius: 8px; color: #15803d; height: 29px; padding: 7px; width: 29px; }.cokifimi-member-expiry-card span { color: #64748b; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }.cokifimi-member-expiry-card strong { color: #17382e; font-size: 13px; line-height: 1.2; }.cokifimi-member-expiry-highlight { background: #effcf5; border-color: #a7f3d0; }.cokifimi-member-expiry-highlight strong { color: #087443; }.cokifimi-member-expiry-dashboard.is-expired .cokifimi-member-expiry-highlight { background: #fff1f2; border-color: #fecdd3; }.cokifimi-member-expiry-dashboard.is-expired .cokifimi-member-expiry-highlight svg { background: #ffe4e6; color: #be123c; }.cokifimi-member-expiry-dashboard.is-expired .cokifimi-member-expiry-highlight strong { color: #be123c; }
 .cokifimi-member-consultorios-summary { align-items: center; background: #f8fffb; border: 1px solid #d9eee2; border-radius: 13px; display: flex; gap: 18px; justify-content: space-between; margin: -12px 0 25px; padding: 13px 16px; }.cokifimi-member-consultorios-summary-title { align-items: center; color: #316052; display: flex; gap: 9px; }.cokifimi-member-consultorios-summary-title svg { background: #dcfce7; border-radius: 8px; color: #15803d; height: 29px; padding: 7px; width: 29px; }.cokifimi-member-consultorios-summary-title span { font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }.cokifimi-member-consultorios-summary-title strong { color: #087443; font-size: 17px; }.cokifimi-member-consultorios-summary-cities { align-items: center; color: #475569; display: flex; font-size: 12px; font-weight: 700; gap: 6px; text-align: right; }.cokifimi-member-consultorios-summary-cities svg { color: #15803d; height: 15px; width: 15px; }
 .cokifimi-member-token-blocked-modal > svg { color: #b91c1c; }
+.cokifimi-member-save-error-modal { border: 1px solid #fecaca; max-width: 460px; }
+.cokifimi-member-save-error-icon { align-items: center; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 999px; color: #be123c; display: flex; height: 56px; justify-content: center; margin: 0 auto 14px; width: 56px; }
+.cokifimi-member-save-error-icon svg { height: 29px; width: 29px; }
+.cokifimi-member-save-error-kicker { color: #be123c !important; font-size: 11px !important; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.cokifimi-member-save-error-modal h2 { color: #7f1d1d; }
 .cokifimi-member-token-blocked-modal h2 { color: #7f1d1d; }
 .cokifimi-member-token-reset-modal > svg { color: #0f8a63; }
 .cokifimi-member-not-registered-modal > svg { color: #0f8a63; }.cokifimi-member-not-registered-modal p:first-of-type { color: #b42318; font-weight: 850; }
@@ -1879,7 +1883,7 @@ select, input[type="text"], input[type="date"], input[type="tel"] {
 .cokifimi-member-resend-code:disabled { cursor: wait !important; opacity: .55 !important; }
 .cokifimi-email-official-notice { align-items: flex-start; background: #f0f8f4; border: 1px solid #c6e5d2; border-radius: 9px; color: #26644d; display: flex; font-size: 11px; gap: 7px; line-height: 1.35; margin-top: 8px; padding: 8px 10px; }
 .cokifimi-email-official-notice svg { flex: 0 0 auto; height: 15px; margin-top: 1px; width: 15px; }
-.cokifimi-member-forms-grid .cokifimi-member-form-card.is-upcoming:nth-child(2) h3 { font-size: 0 !important; }.cokifimi-member-forms-grid .cokifimi-member-form-card.is-upcoming:nth-child(2) h3::after { color: #687d73; content: 'Habilitación de Consultorio / Área Kinésica'; display: block; font-size: 17px; line-height: 1.25; }.cokifimi-member-forms-grid .cokifimi-member-form-card.is-upcoming:nth-child(2) p { font-size: 0 !important; }.cokifimi-member-forms-grid .cokifimi-member-form-card.is-upcoming:nth-child(2) p::after { background: #edf4ef; border: 1px solid #d2e2d8; border-radius: 9px; color: #82968d; content: 'Se habilita luego de presentar declaración jurada'; display: inline-flex; font-size: 11px; font-weight: 800; margin-top: 14px; padding: 8px 11px; }
+.cokifimi-member-forms-grid .cokifimi-member-form-card.is-upcoming:nth-child(2) h3 { font-size: 0 !important; }.cokifimi-member-forms-grid .cokifimi-member-form-card.is-upcoming:nth-child(2) h3::after { color: #687d73; content: 'Habilitación de Consultorio / Área Kinésica'; display: block; font-size: 17px; line-height: 1.25; }.cokifimi-member-forms-grid .cokifimi-member-form-card.is-upcoming:nth-child(2) p { font-size: 0 !important; }.cokifimi-member-forms-grid .cokifimi-member-form-card.is-upcoming:nth-child(2) p::after { background: #edf4ef; border: 1px solid #d2e2d8; border-radius: 9px; color: #82968d; content: 'SOLO PARA COLEGIADO TITULAR'; display: inline-flex; font-size: 11px; font-weight: 800; margin-top: 14px; padding: 8px 11px; }
 .cokifimi-wordpress-shell .cokifimi-admin-portal #dashboard-container .cokifimi-admin-actions {
   align-items: center !important;
   display: flex !important;
@@ -2447,6 +2451,9 @@ html body > .cokifimi-consultorio-review-modal-layer .cokifimi-consultorio-revie
   color: #16815b;
   font-size: 11px;
   font-weight: 700;
+}
+.cokifimi-consultorio-documents .cokifimi-document-format-note {
+  color: #b45309;
 }
 
 .cokifimi-consultorio-print-page > footer { display: block !important; }
@@ -4219,6 +4226,7 @@ body:has(#declaration-preview-container) > footer {
 }
 .cokifimi-member-info-only #step-matricula, .cokifimi-member-info-only #step-personales { position: relative; }
 .cokifimi-member-info-only #step-matricula > div, .cokifimi-member-info-only #step-personales > div { pointer-events: none; opacity: .72; }
+.cokifimi-member-info-only #step-personales > div:nth-child(1), .cokifimi-member-info-only #step-personales > div:nth-child(2) { pointer-events: auto; opacity: 1; }
 /* En el Bianual las fechas deben seguir siendo editables para el colegiado. */
 
 /* El Formulario 1 Bianual permite editar sus fechas aun al modificar un registro existente. */
@@ -5784,6 +5792,9 @@ html body .cokifimi-member-form-shell > #form-wizard {
   font-size: 11px;
   font-weight: 700;
   margin-top: 4px;
+}
+.cokifimi-wordpress-shell .cokifimi-consultorio-form .cokifimi-required-document-loaded::after {
+  content: none;
 }
 @media (max-width: 760px) {
   .cokifimi-wordpress-shell .cokifimi-consultorio-form .cokifimi-consultorio-inherited-document {
@@ -8319,3 +8330,316 @@ html body > .cokifimi-consultorio-review-box.is-modal-open {
   z-index: 2147483647 !important;
 }
 html body > .cokifimi-consultorio-review-box.is-modal-open::before { display: none !important; }
+
+/* Suspension de altas de consultorio: accion y modal administrativo. */
+.cokifimi-request-history-slot .is-suspend {
+  align-items: center;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 10px;
+  color: #be123c;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 7px;
+  justify-content: center;
+  margin-top: 10px;
+  min-height: 40px;
+  padding: 9px 14px;
+  width: 100%;
+}
+.cokifimi-request-history-slot .is-suspend:hover { background: #ffe4e6; border-color: #fb7185; }
+.cokifimi-request-history-slot .is-suspend svg { height: 16px; width: 16px; }
+html body > .cokifimi-suspension-modal {
+  align-items: center;
+  background: rgb(2 44 34 / .62);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  overflow: auto;
+  padding: 16px;
+  position: fixed;
+  z-index: 2147483647;
+}
+.cokifimi-suspension-dialog {
+  background: #fff;
+  border: 1px solid #fecdd3;
+  border-radius: 20px;
+  box-shadow: 0 24px 70px rgb(2 44 34 / .28);
+  box-sizing: border-box;
+  color: #17382e;
+  max-width: 540px;
+  padding: 24px;
+  width: min(540px, 100%);
+}
+.cokifimi-suspension-dialog header { align-items: flex-start; display: flex; gap: 16px; justify-content: space-between; }
+.cokifimi-suspension-dialog header span { color: #be123c; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.cokifimi-suspension-dialog h2 { color: #17382e; font-size: 22px; line-height: 1.15; margin: 6px 0 0; }
+.cokifimi-suspension-dialog header > button { align-items: center; background: transparent; border: 0; color: #64748b; display: inline-flex; padding: 4px; }
+.cokifimi-suspension-dialog header > button svg { height: 20px; width: 20px; }
+.cokifimi-suspension-recipient { background: #f8fafc; border-radius: 9px; color: #334155; font-weight: 800; margin: 20px 0 8px; padding: 10px 12px; }
+.cokifimi-suspension-help { color: #64748b; font-size: 13px; margin: 0 0 12px; }
+.cokifimi-suspension-dialog textarea { border: 1px solid #cbd5e1; border-radius: 11px; box-sizing: border-box; color: #17382e; display: block; font: inherit; min-height: 130px; padding: 12px; resize: vertical; width: 100%; }
+.cokifimi-suspension-dialog textarea:focus { border-color: #fb7185; box-shadow: 0 0 0 3px rgb(251 113 133 / .18); outline: none; }
+.cokifimi-suspension-counter { color: #94a3b8; font-size: 11px; margin-top: 5px; text-align: right; }
+.cokifimi-suspension-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.cokifimi-suspension-actions button { border: 1px solid #cbd5e1; border-radius: 10px; color: #475569; font-weight: 800; min-height: 42px; padding: 9px 14px; }
+.cokifimi-suspension-actions .is-danger { align-items: center; background: #be123c; border-color: #be123c; color: #fff; display: inline-flex; gap: 7px; }
+.cokifimi-suspension-actions .is-danger:disabled { cursor: not-allowed; opacity: .55; }
+.cokifimi-suspension-actions .is-danger svg { height: 16px; width: 16px; }
+@media (max-width: 640px) {
+  .cokifimi-suspension-modal { align-items: flex-end; padding: 8px; }
+  .cokifimi-suspension-dialog { border-radius: 18px; padding: 20px 16px; }
+  .cokifimi-suspension-actions { flex-direction: column-reverse; }
+  .cokifimi-suspension-actions button { width: 100%; }
+}
+.cokifimi-consultorio-request-card.is-suspended { border-color: #fecdd3; }
+.cokifimi-consultorio-request-card .cokifimi-request-status-cell em.is-suspended { background: #ffe4e6; color: #be123c; }
+.cokifimi-request-history-slot .is-suspend.is-active { background: #ffe4e6; border-color: #fda4af; color: #be123c; }
+.cokifimi-suspension-dialog textarea[readonly] { background: #fff1f2; border-color: #fda4af; color: #881337; }
+/* Botones del modal de suspension: prioridad sobre estilos globales del tema. */
+html body > .cokifimi-suspension-modal .cokifimi-suspension-actions button {
+  appearance: none !important;
+  align-items: center !important;
+  background: #f1f5f3 !important;
+  border: 1px solid #b8cbc1 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 2px 5px rgb(4 54 36 / .10) !important;
+  box-sizing: border-box !important;
+  color: #174936 !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  gap: 7px !important;
+  justify-content: center !important;
+  line-height: 1.2 !important;
+  min-height: 42px !important;
+  padding: 10px 16px !important;
+  text-decoration: none !important;
+  text-transform: none !important;
+  transition: background .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease !important;
+}
+html body > .cokifimi-suspension-modal .cokifimi-suspension-actions button:hover:not(:disabled) {
+  background: #e2eee8 !important;
+  border-color: #8eb4a1 !important;
+  box-shadow: 0 4px 10px rgb(4 54 36 / .14) !important;
+  color: #0d3929 !important;
+  transform: translateY(-1px) !important;
+}
+html body > .cokifimi-suspension-modal .cokifimi-suspension-actions button:focus-visible {
+  box-shadow: 0 0 0 3px rgb(20 120 78 / .22), 0 3px 8px rgb(4 54 36 / .12) !important;
+  outline: 2px solid #27845e !important;
+  outline-offset: 1px !important;
+}
+html body > .cokifimi-suspension-modal .cokifimi-suspension-actions button:disabled {
+  cursor: not-allowed !important;
+  opacity: .58 !important;
+  transform: none !important;
+}
+html body > .cokifimi-suspension-modal .cokifimi-suspension-actions button.is-danger {
+  background: #c92f58 !important;
+  border-color: #b4234a !important;
+  color: #fff !important;
+  text-shadow: 0 1px 1px rgb(70 0 20 / .16) !important;
+}
+html body > .cokifimi-suspension-modal .cokifimi-suspension-actions button.is-danger:hover:not(:disabled) {
+  background: #a91f45 !important;
+  border-color: #8f1839 !important;
+  color: #fff !important;
+}
+html body > .cokifimi-suspension-modal .cokifimi-suspension-actions button.is-danger:focus-visible {
+  box-shadow: 0 0 0 3px rgb(201 47 88 / .24), 0 3px 8px rgb(4 54 36 / .12) !important;
+  outline-color: #c92f58 !important;
+}
+html body > .cokifimi-suspension-modal .cokifimi-suspension-actions button svg {
+  flex: 0 0 auto !important;
+  height: 16px !important;
+  width: 16px !important;
+}
+@media (max-width: 640px) {
+  html body > .cokifimi-suspension-modal .cokifimi-suspension-actions button {
+    min-height: 46px !important;
+    width: 100% !important;
+  }
+}
+/* Scroll del documento habilitado con encabezado sticky. */
+html, body, #root { height: auto !important; min-height: 100% !important; overflow-y: auto !important; }
+.cokifimi-app { min-height: 100vh !important; }
+.cokifimi-app > nav { position: sticky !important; top: 0 !important; z-index: 1000 !important; }
+.cokifimi-general-dashboard { background: linear-gradient(145deg,#fff,#f4fbf7); border: 1px solid #cfe8da; border-radius: 20px; box-shadow: 0 14px 34px rgb(15 90 62 / .08); margin: 0 auto 20px; max-width: 1180px; padding: 22px; }
+.cokifimi-general-dashboard-heading { align-items: center; border-bottom: 1px solid #deeee5; display: flex; justify-content: space-between; margin-bottom: 17px; padding-bottom: 14px; }
+.cokifimi-general-dashboard-heading p { color: #08704a; font-size: 10px; font-weight: 850; letter-spacing: .12em; margin: 0; text-transform: uppercase; }.cokifimi-general-dashboard-heading h3 { color: #102e25; font-size: 20px; margin: 4px 0; }.cokifimi-general-dashboard-heading span { color: #71897e; font-size: 11px; }.cokifimi-general-dashboard-date { background: #e3f6eb; border-radius: 999px; color: #0f6b49; font-size: 10px; font-weight: 800; padding: 7px 11px; }
+.cokifimi-general-dashboard-grid { display: grid; gap: 10px; grid-template-columns: repeat(4,minmax(0,1fr)); }.cokifimi-general-dashboard-card { background: #fff; border: 1px solid #e0eee7; border-left: 4px solid #2563eb; border-radius: 13px; display: flex; flex-direction: column; padding: 14px 15px; }.cokifimi-general-dashboard-card span { color: #60786d; font-size: 10px; font-weight: 800; text-transform: uppercase; }.cokifimi-general-dashboard-card strong { color: #102e25; font-size: 27px; line-height: 1; margin: 7px 0 4px; }.cokifimi-general-dashboard-card small { color: #789087; font-size: 10px; }.cokifimi-general-dashboard-card.is-green { border-left-color: #16a36e; }.cokifimi-general-dashboard-card.is-amber { border-left-color: #e09222; }.cokifimi-general-dashboard-card.is-teal { border-left-color: #0f8f68; }
+.cokifimi-general-dashboard-columns { display: grid; gap: 10px; grid-template-columns: repeat(3,minmax(0,1fr)); margin-top: 12px; }.cokifimi-general-dashboard-panel { background: rgb(255 255 255 / .78); border: 1px solid #e0eee7; border-radius: 13px; padding: 15px; }.cokifimi-general-dashboard-panel-title { align-items: baseline; display: flex; justify-content: space-between; margin-bottom: 13px; }.cokifimi-general-dashboard-panel-title strong { color: #174b39; font-size: 12px; }.cokifimi-general-dashboard-panel-title span { color: #81968c; font-size: 9px; }.cokifimi-general-status-row { align-items: center; display: grid; gap: 8px; grid-template-columns: 8px 1fr auto; margin: 10px 0; }.cokifimi-general-status-row i { background: #16a36e; border-radius: 99px; height: 26px; width: 5px; }.cokifimi-general-status-row i.is-amber { background: #e09222; }.cokifimi-general-status-row div { display: flex; flex-direction: column; }.cokifimi-general-status-row span { color: #60786d; font-size: 10px; }.cokifimi-general-status-row b { color: #174b39; font-size: 15px; }.cokifimi-general-status-row em { color: #0f6b49; font-size: 11px; font-style: normal; font-weight: 850; }.cokifimi-general-status-track { background: #edf5f0; border-radius: 99px; height: 8px; margin-top: 14px; overflow: hidden; }.cokifimi-general-status-track b { background: linear-gradient(90deg,#0f8f68,#4cc493); border-radius: inherit; display: block; height: 100%; }.cokifimi-general-territory-list { display: grid; gap: 7px; }.cokifimi-general-territory-list > div { align-items: center; display: grid; gap: 8px; grid-template-columns: 22px 1fr auto; }.cokifimi-general-territory-list > div > b { color: #91a99d; font-size: 10px; }.cokifimi-general-territory-list span { color: #315d4d; font-size: 10px; font-weight: 800; text-transform: uppercase; }.cokifimi-general-territory-list small { color: #8aa197; display: inline; font-size: 9px; font-weight: 500; margin-left: 5px; text-transform: none; }.cokifimi-general-territory-list strong { background: #e3f6eb; border-radius: 99px; color: #0f6b49; font-size: 10px; padding: 4px 8px; }.cokifimi-general-territory-list p { color: #71877d; font-size: 11px; }.cokifimi-general-dashboard-panel.is-actions button { background: #0f5a3e; border: 0; border-radius: 9px; color: #fff; cursor: pointer; font-size: 11px; font-weight: 800; padding: 10px 12px; width: 100%; }.cokifimi-general-dashboard-panel.is-actions p { color: #71877d; font-size: 10px; line-height: 1.4; margin: 11px 0 0; }
+@media (max-width: 760px) { .cokifimi-general-dashboard { padding: 16px; }.cokifimi-general-dashboard-grid,.cokifimi-general-dashboard-columns { grid-template-columns: repeat(2,minmax(0,1fr)); }.cokifimi-general-dashboard-heading { align-items: flex-start; gap: 10px; }.cokifimi-general-dashboard-date { display: none; } }
+@media (max-width: 480px) { .cokifimi-general-dashboard-grid,.cokifimi-general-dashboard-columns { grid-template-columns: 1fr; }.cokifimi-general-dashboard-heading h3 { font-size: 17px; } }
+/* Panel de altas: jerarquía visual y estado de suspensión. */
+.cokifimi-consultorio-request-metrics > div { border-top: 3px solid transparent; }
+.cokifimi-consultorio-request-metrics > div.is-approved { border-top-color: #22c55e; }
+.cokifimi-consultorio-request-metrics > div.is-pending { border-top-color: #f59e0b; }
+.cokifimi-consultorio-request-metrics > div.is-rejected,
+.cokifimi-consultorio-request-metrics > div.is-suspended { border-top-color: #ef6f86; }
+.cokifimi-consultorio-request-metrics > div.is-suspended { background: #fff6f7; }
+.cokifimi-consultorio-request-metrics > div.is-suspended > svg { background: #ffe1e7; color: #c2415d; }
+.cokifimi-consultorio-request-metrics > div.is-suspended strong { color: #b42345; }
+.cokifimi-consultorio-request-metrics > div.is-payment { border-top-color: #3b82f6; }
+.cokifimi-consultorio-request-metrics > div.is-amount { border-top-color: #8b5cf6; }
+.cokifimi-consultorio-request-metrics > div.is-expiry { border-top-color: #f97316; }
+
+/* Modal de lista de altas: aislado de los estilos globales del tema */
+.cokifimi-roster-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483647 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+  background: rgba(15, 23, 42, .72) !important;
+  isolation: isolate !important;
+}
+.cokifimi-roster-modal *, .cokifimi-roster-modal *::before, .cokifimi-roster-modal *::after { box-sizing: border-box !important; }
+.cokifimi-roster-dialog {
+  position: relative !important;
+  z-index: 1 !important;
+  width: min(1180px, 100%) !important;
+  max-height: 92vh !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid #d8eee4 !important;
+  border-radius: 20px !important;
+  background: #fff !important;
+  color: #172b25 !important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .35) !important;
+}
+.cokifimi-roster-modal button {
+  min-height: 0 !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  font-family: inherit !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  line-height: 1.25 !important;
+  opacity: 1 !important;
+  cursor: pointer !important;
+}
+.cokifimi-roster-close {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  border: 1px solid #cfe5db !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  color: #0f5a3e !important;
+}
+.cokifimi-roster-close:hover { background: #e9f8f0 !important; }
+.cokifimi-roster-bulk-action { border: 0 !important; background: transparent !important; color: #087f59 !important; }
+.cokifimi-roster-bulk-action:hover { color: #064e3b !important; text-decoration: underline !important; }
+.cokifimi-roster-check { padding: 0 !important; border-width: 1px !important; } .cokifimi-roster-filter { flex: 0 0 auto !important; } .cokifimi-roster-date-input { min-width: 190px !important; min-height: 40px !important; background: #fff !important; color: #17382d !important; } .cokifimi-roster-date-input:focus { outline: 3px solid rgba(8, 127, 89, .16) !important; border-color: #087f59 !important; } .cokifimi-roster-filter-summary { display: flex !important; align-items: center !important; gap: 14px !important; margin-left: auto !important; color: #526d63 !important; } .cokifimi-roster-filter-summary strong { color: #087f59 !important; font-size: 15px !important; } .cokifimi-roster-filter-summary span { font-size: 13px !important; } .cokifimi-roster-filter-summary small { color: #71847c !important; } .cokifimi-roster-dialog  .cokifimi-roster-dialog .cokifimi-roster-table thead { position: sticky !important; top: 0 !important; z-index: 30 !important; background: #087f59 !important; } .cokifimi-roster-dialog .cokifimi-roster-table thead th { position: sticky !important; top: 0 !important; z-index: 31 !important; background: #087f59 !important; color: #fff !important; box-shadow: inset 0 -1px 0 rgba(255,255,255,.28) !important; } .cokifimi-roster-dialog .cokifimi-roster-table thead { position: relative !important; top: auto !important; } .cokifimi-roster-dialog .cokifimi-roster-table thead th { position: sticky !important; top: 0 !important; z-index: 31 !important; } .cokifimi-roster-table-scroll { overflow: hidden !important; } .cokifimi-roster-table-scroll  .cokifimi-roster-filter label { color: #075f43 !important; font-size: 13px !important; letter-spacing: .02em !important; } .cokifimi-roster-date-input { border: 2px solid #62c9a3 !important; background: #f0fff8 !important; box-shadow: 0 4px 12px rgba(8,127,89,.12) !important; animation: cokifimi-roster-date-pulse 2.4s ease-in-out infinite !important; } .cokifimi-roster-date-input:hover, .cokifimi-roster-date-input:focus { border-color: #087f59 !important; background: #e6fff3 !important; animation: none !important; } @keyframes cokifimi-roster-date-pulse { 0%, 100% { border-color: #62c9a3; box-shadow: 0 4px 12px rgba(8,127,89,.10); } 50% { border-color: #087f59; box-shadow: 0 0 0 4px rgba(8,127,89,.14), 0 6px 16px rgba(8,127,89,.18); } }.cokifimi-roster-table { display: table !important; height: auto !important; } .cokifimi-roster-table-scroll .cokifimi-roster-table thead { display: table !important; width: 100% !important; table-layout: fixed !important; position: static !important; } .cokifimi-roster-table-scroll .cokifimi-roster-table thead th { position: static !important; } .cokifimi-roster-table-scroll .cokifimi-roster-table tbody { display: block !important; width: 100% !important; max-height: calc(92vh - 390px) !important; overflow-y: auto !important; overflow-x: hidden !important; } .cokifimi-roster-table-scroll .cokifimi-roster-table tbody tr { display: table !important; width: 100% !important; table-layout: fixed !important; } .cokifimi-roster-filter label { color: #075f43 !important; font-size: 13px !important; letter-spacing: .02em !important; } .cokifimi-roster-date-input { border: 2px solid #62c9a3 !important; background: #f0fff8 !important; box-shadow: 0 4px 12px rgba(8,127,89,.12) !important; animation: cokifimi-roster-date-pulse 2.4s ease-in-out infinite !important; } .cokifimi-roster-date-input:hover, .cokifimi-roster-date-input:focus { border-color: #087f59 !important; background: #e6fff3 !important; animation: none !important; } @keyframes cokifimi-roster-date-pulse { 0%, 100% { border-color: #62c9a3; box-shadow: 0 4px 12px rgba(8,127,89,.10); } 50% { border-color: #087f59; box-shadow: 0 0 0 4px rgba(8,127,89,.14), 0 6px 16px rgba(8,127,89,.18); } }.cokifimi-roster-table { display: table !important; table-layout: fixed !important; width: 100% !important; } .cokifimi-roster-dialog .cokifimi-roster-table thead { display: table-header-group !important; } .cokifimi-roster-dialog .cokifimi-roster-table tbody { display: table-row-group !important; } .cokifimi-roster-dialog .cokifimi-roster-table tr { display: table-row !important; } .cokifimi-roster-dialog .cokifimi-roster-table th, .cokifimi-roster-dialog .cokifimi-roster-table td { display: table-cell !important; } .cokifimi-roster-dialog .cokifimi-roster-table thead { position: sticky !important; top: 0 !important; z-index: 30 !important; background: #087f59 !important; } .cokifimi-roster-dialog .cokifimi-roster-table thead th { position: sticky !important; top: 0 !important; z-index: 31 !important; background: #087f59 !important; color: #fff !important; box-shadow: inset 0 -1px 0 rgba(255,255,255,.28) !important; } .cokifimi-roster-dialog .cokifimi-roster-table thead { position: relative !important; top: auto !important; } .cokifimi-roster-dialog .cokifimi-roster-table thead th { position: sticky !important; top: 0 !important; z-index: 31 !important; } .cokifimi-roster-table-scroll { overflow: hidden !important; } .cokifimi-roster-table-scroll  .cokifimi-roster-filter label { color: #075f43 !important; font-size: 13px !important; letter-spacing: .02em !important; } .cokifimi-roster-date-input { border: 2px solid #62c9a3 !important; background: #f0fff8 !important; box-shadow: 0 4px 12px rgba(8,127,89,.12) !important; animation: cokifimi-roster-date-pulse 2.4s ease-in-out infinite !important; } .cokifimi-roster-date-input:hover, .cokifimi-roster-date-input:focus { border-color: #087f59 !important; background: #e6fff3 !important; animation: none !important; } @keyframes cokifimi-roster-date-pulse { 0%, 100% { border-color: #62c9a3; box-shadow: 0 4px 12px rgba(8,127,89,.10); } 50% { border-color: #087f59; box-shadow: 0 0 0 4px rgba(8,127,89,.14), 0 6px 16px rgba(8,127,89,.18); } }.cokifimi-roster-table { display: table !important; height: auto !important; } .cokifimi-roster-table-scroll .cokifimi-roster-table thead { display: table !important; width: 100% !important; table-layout: fixed !important; position: static !important; } .cokifimi-roster-table-scroll .cokifimi-roster-table thead th { position: static !important; } .cokifimi-roster-table-scroll .cokifimi-roster-table tbody { display: block !important; width: 100% !important; max-height: calc(92vh - 390px) !important; overflow-y: auto !important; overflow-x: hidden !important; } .cokifimi-roster-table-scroll .cokifimi-roster-table tbody tr { display: table !important; width: 100% !important; table-layout: fixed !important; } .cokifimi-roster-filter label { color: #075f43 !important; font-size: 13px !important; letter-spacing: .02em !important; } .cokifimi-roster-date-input { border: 2px solid #62c9a3 !important; background: #f0fff8 !important; box-shadow: 0 4px 12px rgba(8,127,89,.12) !important; animation: cokifimi-roster-date-pulse 2.4s ease-in-out infinite !important; } .cokifimi-roster-date-input:hover, .cokifimi-roster-date-input:focus { border-color: #087f59 !important; background: #e6fff3 !important; animation: none !important; } @keyframes cokifimi-roster-date-pulse { 0%, 100% { border-color: #62c9a3; box-shadow: 0 4px 12px rgba(8,127,89,.10); } 50% { border-color: #087f59; box-shadow: 0 0 0 4px rgba(8,127,89,.14), 0 6px 16px rgba(8,127,89,.18); } }.cokifimi-roster-table { table-layout: fixed !important; width: 100% !important; min-width: 800px !important; }
+.cokifimi-roster-table th, .cokifimi-roster-table td { width: auto !important; vertical-align: middle !important; overflow-wrap: anywhere !important; }
+.cokifimi-roster-table th:nth-child(1), .cokifimi-roster-table td:nth-child(1) { width: 8% !important; text-align: center !important; }
+.cokifimi-roster-table th:nth-child(2), .cokifimi-roster-table td:nth-child(2) { width: 27% !important; }
+.cokifimi-roster-table th:nth-child(3), .cokifimi-roster-table td:nth-child(3) { width: 12% !important; }
+.cokifimi-roster-table th:nth-child(4), .cokifimi-roster-table td:nth-child(4) { width: 15% !important; }
+.cokifimi-roster-table th:nth-child(5), .cokifimi-roster-table td:nth-child(5) { width: 38% !important; }
+.cokifimi-roster-table thead th { height: 58px !important; padding: 10px 12px !important; line-height: 1.2 !important; white-space: normal !important; text-align: left !important; }
+.cokifimi-roster-table thead th:first-child { text-align: center !important; }
+.cokifimi-roster-table tbody td { padding: 12px !important; line-height: 1.35 !important; }
+.cokifimi-roster-check { width: 23px !important; height: 23px !important; min-width: 23px !important; border: 2px solid #8aa99c !important; border-radius: 7px !important; background: #fff !important; color: #fff !important; box-shadow: 0 1px 3px rgba(15, 90, 62, .18) !important; transition: background .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease !important; }
+.cokifimi-roster-check:hover { border-color: #087f59 !important; background: #effaf5 !important; transform: scale(1.06) !important; box-shadow: 0 0 0 4px rgba(8, 127, 89, .12) !important; }
+.cokifimi-roster-check[aria-pressed="true"] { border-color: #087f59 !important; background: #087f59 !important; box-shadow: 0 0 0 3px rgba(8, 127, 89, .14) !important; }
+html body > .cokifimi-roster-modal { position: fixed !important; inset: 0 !important; z-index: 2147483647 !important; }
+.cokifimi-roster-cancel {
+  border: 1px solid #c9d9d2 !important;
+  background: #fff !important;
+  color: #285044 !important;
+}
+.cokifimi-roster-cancel:hover { background: #f0f8f4 !important; }
+.cokifimi-roster-download {
+  border: 1px solid #087f59 !important;
+  background: #087f59 !important;
+  color: #fff !important;
+  box-shadow: 0 5px 12px rgba(8, 127, 89, .2) !important;
+}
+.cokifimi-roster-download:hover { background: #056344 !important; }
+.cokifimi-roster-download:disabled { background: #9bbcaf !important; border-color: #9bbcaf !important; color: #fff !important; }
+.cokifimi-roster-dialog table { margin: 0 !important; border-spacing: 0 !important; background: #fff !important; }
+.cokifimi-roster-dialog th, .cokifimi-roster-dialog td { border: 0 !important; }
+.cokifimi-roster-dialog thead th { background: #087f59 !important; color: #fff !important; font-weight: 700 !important; }
+.cokifimi-roster-dialog tbody tr { background: #fff !important; }
+.cokifimi-roster-dialog tbody tr:hover { background: #effaf5 !important; }
+@media (max-width: 640px) {
+  .cokifimi-roster-modal { padding: 8px !important; }
+  .cokifimi-roster-dialog { max-height: 96vh !important; border-radius: 14px !important; }
+}
+.cokifimi-roster-modal svg { display: inline-block !important; visibility: visible !important; opacity: 1 !important; flex: 0 0 auto !important; }
+.cokifimi-roster-close svg { width: 20px !important; height: 20px !important; stroke: #0f5a3e !important; stroke-width: 2.2 !important; }
+.cokifimi-roster-download svg { width: 18px !important; height: 18px !important; stroke: #fff !important; }
+.cokifimi-roster-check svg { width: 14px !important; height: 14px !important; stroke: #fff !important; }
+
+/* Exportar fichas bianuales a Excel */
+.cokifimi-excel-export-trigger { align-items: center !important; background: #e9f8f0 !important; border: 1px solid #a8d9c0 !important; border-radius: 9px !important; color: #087f59 !important; cursor: pointer !important; display: inline-flex !important; height: 36px !important; justify-content: center !important; padding: 0 !important; width: 38px !important; }
+.cokifimi-excel-export-trigger:hover { background: #d6f2e3 !important; border-color: #087f59 !important; }
+.cokifimi-excel-export-trigger svg { height: 19px !important; width: 19px !important; stroke: #087f59 !important; }
+html body > .cokifimi-excel-export-modal { align-items: center !important; background: rgba(4, 30, 21, .72) !important; display: flex !important; inset: 0 !important; isolation: isolate !important; justify-content: center !important; overflow: auto !important; padding: 16px !important; position: fixed !important; z-index: 2147483647 !important; }
+.cokifimi-excel-export-modal, .cokifimi-excel-export-modal * { box-sizing: border-box !important; }
+.cokifimi-excel-export-dialog { background: #fff !important; border: 1px solid #d7ebe0 !important; border-radius: 20px !important; box-shadow: 0 24px 80px rgba(0,0,0,.35) !important; color: #17382e !important; display: flex !important; flex-direction: column !important; font-family: inherit !important; margin: auto !important; max-height: min(90vh, 760px) !important; max-width: 680px !important; overflow: hidden !important; width: min(680px, 100%) !important; }
+.cokifimi-excel-export-dialog > header { align-items: flex-start !important; background: #f2faf5 !important; border-bottom: 1px solid #dbece1 !important; display: flex !important; justify-content: space-between !important; padding: 20px 22px !important; }
+.cokifimi-excel-export-dialog > header span { color: #087f59 !important; font-size: 10px !important; font-weight: 800 !important; letter-spacing: .1em !important; }
+.cokifimi-excel-export-dialog > header h2 { align-items: center !important; color: #073f2b !important; display: flex !important; font-size: 23px !important; font-weight: 850 !important; gap: 9px !important; margin: 5px 0 !important; }
+.cokifimi-excel-export-dialog > header h2 svg { color: #087f59 !important; height: 22px !important; width: 22px !important; }
+.cokifimi-excel-export-dialog > header p { color: #60786c !important; font-size: 12px !important; margin: 0 !important; }
+.cokifimi-excel-export-dialog > header > button { background: #fff !important; border: 1px solid #cfe5db !important; border-radius: 9px !important; color: #527365 !important; cursor: pointer !important; display: inline-flex !important; padding: 7px !important; }
+.cokifimi-excel-export-controls { align-items: center !important; border-bottom: 1px solid #e4eee8 !important; display: flex !important; gap: 10px !important; padding: 14px 18px !important; }
+.cokifimi-excel-export-controls > label { align-items: center !important; border: 1px solid #cfe0d6 !important; border-radius: 9px !important; display: flex !important; flex: 1 !important; gap: 8px !important; min-width: 0 !important; padding: 0 10px !important; }
+.cokifimi-excel-export-controls > label svg { color: #738a80 !important; flex: 0 0 auto !important; height: 16px !important; width: 16px !important; }
+.cokifimi-excel-export-controls input { background: #fff !important; border: 0 !important; color: #17382e !important; min-width: 0 !important; outline: none !important; padding: 10px 0 !important; width: 100% !important; }
+.cokifimi-excel-export-controls > button { background: transparent !important; border: 0 !important; color: #087f59 !important; cursor: pointer !important; font-size: 11px !important; font-weight: 800 !important; white-space: nowrap !important; }
+.cokifimi-excel-export-controls > button:disabled { color: #9aaba3 !important; cursor: default !important; }
+.cokifimi-excel-export-list { flex: 1 !important; min-height: 180px !important; overflow: auto !important; padding: 8px 18px !important; }
+.cokifimi-excel-export-list > label { align-items: center !important; border-bottom: 1px solid #edf2ee !important; cursor: pointer !important; display: flex !important; gap: 12px !important; padding: 11px 8px !important; }
+.cokifimi-excel-export-list > label.is-selected { background: #f0faf4 !important; }
+.cokifimi-excel-export-list input { accent-color: #087f59 !important; height: 17px !important; width: 17px !important; }
+.cokifimi-excel-export-list span { display: flex !important; flex-direction: column !important; gap: 3px !important; }
+.cokifimi-excel-export-list strong { color: #17382e !important; font-size: 13px !important; }
+.cokifimi-excel-export-list small { color: #738a80 !important; font-size: 11px !important; }
+.cokifimi-excel-export-list > p { color: #738a80 !important; padding: 24px !important; text-align: center !important; }
+.cokifimi-excel-export-dialog > footer { align-items: center !important; background: #f8fbf9 !important; border-top: 1px solid #e4eee8 !important; color: #60786c !important; display: flex !important; font-size: 12px !important; justify-content: space-between !important; padding: 14px 18px !important; }
+.cokifimi-excel-export-dialog > footer > div { display: flex !important; gap: 8px !important; }
+.cokifimi-excel-export-dialog > footer button { align-items: center !important; background: #fff !important; border: 1px solid #cfe0d6 !important; border-radius: 9px !important; color: #285044 !important; cursor: pointer !important; display: inline-flex !important; font-size: 12px !important; font-weight: 750 !important; gap: 6px !important; padding: 9px 12px !important; }
+.cokifimi-excel-export-dialog > footer button:last-child { background: #087f59 !important; border-color: #087f59 !important; color: #fff !important; }
+.cokifimi-excel-export-dialog > footer button:last-child:disabled { background: #9bbcaf !important; border-color: #9bbcaf !important; cursor: default !important; }
+.cokifimi-excel-export-dialog > footer button svg { height: 16px !important; width: 16px !important; }
+@media (max-width: 600px) { .cokifimi-excel-export-modal { padding: 8px !important; } .cokifimi-excel-export-dialog { border-radius: 14px !important; max-height: 96vh !important; } .cokifimi-excel-export-dialog > header, .cokifimi-excel-export-controls, .cokifimi-excel-export-dialog > footer { padding-left: 12px !important; padding-right: 12px !important; } .cokifimi-excel-export-controls { align-items: stretch !important; flex-direction: column !important; } .cokifimi-excel-export-controls > button { align-self: flex-start !important; } .cokifimi-excel-export-dialog > footer { align-items: stretch !important; flex-direction: column !important; gap: 10px !important; } .cokifimi-excel-export-dialog > footer > div { justify-content: flex-end !important; } }
+/* Edición acotada de consultorio: adjuntos con estado y acción legible. */
+.cokifimi-consultorio-form .cokifimi-limited-documents { background: #f7fbf8; }
+.cokifimi-limited-documents-title { align-items: baseline; display: flex; gap: 12px; justify-content: space-between; margin-bottom: 16px; }
+.cokifimi-limited-documents-title h2 { margin: 0 !important; }
+.cokifimi-limited-documents-title p { color: #64748b; font-size: 12px; margin: 0; }
+.cokifimi-limited-documents-grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cokifimi-limited-document-card { background: #fff; border: 1px solid #d7e8de; border-radius: 14px; display: flex; flex-direction: column; gap: 12px; min-height: 205px; padding: 16px; }
+.cokifimi-limited-document-card.is-loaded { background: linear-gradient(145deg, #fff, #f0fbf5); border-color: #8dc9a8; }
+.cokifimi-limited-document-card-heading { align-items: flex-start; display: flex; gap: 10px; }
+.cokifimi-limited-document-card-heading > svg { background: #e7f6ed; border-radius: 9px; color: #08764f; flex: 0 0 auto; height: 36px; padding: 8px; width: 36px; }
+.cokifimi-limited-document-card-heading strong { color: #17382e; display: block; font-size: 12px; line-height: 1.35; text-transform: uppercase; }
+.cokifimi-limited-document-card-heading span { color: #64748b; display: block; font-size: 11px; font-weight: 700; margin-top: 3px; }
+.cokifimi-limited-document-status { background: #f7faf8; border: 1px dashed #c8dbd0; border-radius: 8px; color: #425b50; font-size: 12px; margin: 0; min-height: 42px; overflow-wrap: anywhere; padding: 9px 10px; }
+.is-loaded .cokifimi-limited-document-status { background: #eaf8ef; border-style: solid; border-color: #bee2ca; color: #176443; }
+.cokifimi-limited-document-upload { align-items: center; background: #0f5a3e; border-radius: 9px; color: #fff !important; cursor: pointer; display: inline-flex !important; font-size: 12px !important; font-weight: 800 !important; gap: 7px; justify-content: center; margin-top: auto; min-height: 40px; padding: 0 12px; text-transform: none !important; }
+.cokifimi-limited-document-upload:hover { background: #0a4831; }
+.cokifimi-limited-document-upload svg { height: 16px; width: 16px; }
+.cokifimi-limited-document-upload input { height: 1px !important; opacity: 0; overflow: hidden; position: absolute; width: 1px !important; }
+.cokifimi-limited-document-card > small { color: #64748b; font-size: 10px; line-height: 1.35; min-height: 27px; }
+.cokifimi-limited-edit-location { align-items: center; background: rgb(255 255 255 / .14); border: 1px solid rgb(255 255 255 / .22); border-radius: 9px; color: #fff; display: flex; font-size: 12px; gap: 7px; margin-top: 13px; padding: 9px 11px; }
+.cokifimi-limited-edit-location svg { background: transparent !important; color: #d9f5e6 !important; flex: 0 0 auto; height: 17px !important; padding: 0 !important; width: 17px !important; }
+.cokifimi-limited-edit-location strong { color: #fff; display: inline; font-weight: 850; }
+/* La cabecera de edición se presenta como una tarjeta independiente. */
+.cokifimi-consultorio-form .cokifimi-consultorio-wizard-header { border-radius: 16px 16px 0 0; }
+.cokifimi-consultorio-form:has(.cokifimi-limited-edit-location) { padding-top: 14px; }
+.cokifimi-consultorio-form:has(.cokifimi-limited-edit-location) .cokifimi-consultorio-wizard-header { border-radius: 15px; margin: 0 14px; }
+@media (max-width: 640px) { .cokifimi-consultorio-form:has(.cokifimi-limited-edit-location) { padding-top: 10px; } .cokifimi-consultorio-form:has(.cokifimi-limited-edit-location) .cokifimi-consultorio-wizard-header { margin: 0 10px; } }
+@media (max-width: 640px) { .cokifimi-limited-documents-title { align-items: flex-start; flex-direction: column; gap: 4px; } .cokifimi-limited-documents-grid { grid-template-columns: 1fr; } }

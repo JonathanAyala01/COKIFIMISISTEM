@@ -23,12 +23,13 @@ import {
   CalendarDays,
   BadgeCheck,
   Activity,
+  Ban,
 } from "lucide-react";
 import { DeclarationData } from "../types";
 import { normalizeMisionesLocality } from "../data/misionesLocalities";
 import ConsultorioHabilitacionForm, { ConsultorioHabilitacionPreview } from "./ConsultorioHabilitacionForm";
 import { generateAutomaticCertificates } from "../utils/certificates";
-import { isServerConfigured, loadServerRecord, notifyConsultorioResolution } from "../api";
+import { isServerConfigured, loadServerRecord, notifyConsultorioResolution, updateConsultorioSuspensionServer } from "../api";
 import RecordPhoto from "./RecordPhoto";
 
 type Props = {
@@ -181,6 +182,13 @@ export default function ConsultorioRequestsPanel({
       });
     }
   }, [requestDeclarations, selected?.id, selected?.consultorioSolicitudId, selected?.formularioHabilitacionConsultorio?.comprobantePagoAt, selected?.formularioHabilitacionConsultorio?.estadoPago, selected?.formularioHabilitacionConsultorio?.comprobantePagoArchivo]);
+  useEffect(() => {
+    if (!selected) return undefined;
+    const timeout = window.setTimeout(() => {
+      document.querySelector<HTMLElement>(".cokifimi-consultorio-preview-toolbar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => window.clearTimeout(timeout);
+  }, [selected]);
   const keepSelectedRequest = (saved: DeclarationData, source: DeclarationData): DeclarationData => {
     const requestId = source.consultorioSolicitudId;
     if (!requestId) return saved;
@@ -208,10 +216,73 @@ export default function ConsultorioRequestsPanel({
   const [editingConsultorio, setEditingConsultorio] = useState<DeclarationData | null>(null);  const [updatedConsultorioId, setUpdatedConsultorioId] = useState<string | null>(null);
   const [showUpdatedModal, setShowUpdatedModal] = useState(false);
   const [historyItem, setHistoryItem] = useState<DeclarationData | null>(null);
+  const [suspensionTarget, setSuspensionTarget] = useState<DeclarationData | null>(null);
+  const [suspensionDraft, setSuspensionDraft] = useState("");
+  const [savingSuspension, setSavingSuspension] = useState(false);  const [suspensionReadOnly, setSuspensionReadOnly] = useState(false);
   const [savingConsultorio, setSavingConsultorio] = useState(false);
   const [updatedModalTitle, setUpdatedModalTitle] = useState("ACTUALIZADO");
   const [updatedModalMessage, setUpdatedModalMessage] = useState("El alta de consultorio fue actualizada correctamente.");
-  const hasActiveAlta = (item: DeclarationData) => {
+  const getSuspensionForm = async () => {
+    // Para suspender no descargamos nuevamente el registro completo: puede contener adjuntos pesados.
+    const current = suspensionTarget!;
+    const requestId = suspensionTarget!.consultorioSolicitudId || "";
+    const sourceForm = requestId
+      ? (current.consultorioSolicitudes || []).find((request) => request.id === requestId || String(request.formularioHabilitacionConsultorio?.consultorioSolicitudId || "").trim() === requestId)?.formularioHabilitacionConsultorio || {}
+      : current.formularioHabilitacionConsultorio || {};
+    return { current, requestId, sourceForm };
+  };
+  const persistSuspensionForm = async (updatedForm: Record<string, unknown>) => {
+    const { current, requestId } = await getSuspensionForm();
+    const next: DeclarationData = requestId
+      ? { ...current, consultorioSolicitudId: requestId, consultorioSolicitudes: (current.consultorioSolicitudes || []).map((request) => (request.id === requestId || String(request.formularioHabilitacionConsultorio?.consultorioSolicitudId || "").trim() === requestId) ? { ...request, id: request.id || requestId, formularioHabilitacionConsultorio: { ...request.formularioHabilitacionConsultorio, ...updatedForm, consultorioSolicitudId: requestId } } : request), formularioHabilitacionConsultorio: current.formularioHabilitacionConsultorio || {} }
+      : { ...current, formularioHabilitacionConsultorio: updatedForm };
+    await onUpdate(next);
+  };
+  const suspendAlta = async () => {
+    if (!suspensionTarget || !suspensionDraft.trim() || suspensionReadOnly) return;
+    setSavingSuspension(true);
+    const requestId = suspensionTarget.consultorioSolicitudId || String((suspensionTarget.consultorioSolicitudes || []).find((request) => request.formularioHabilitacionConsultorio?.consultorioSolicitudId)?.formularioHabilitacionConsultorio?.consultorioSolicitudId || "").trim();
+    try {
+      const { sourceForm } = await getSuspensionForm();
+      const requestIndex = requestId ? (suspensionTarget!.consultorioSolicitudes || []).findIndex((request) => request.id === requestId || String(request.formularioHabilitacionConsultorio?.consultorioSolicitudId || "").trim() === requestId) : -1;
+      const isProblematic9998 = String(suspensionTarget.matricula || "").replace(/\D+/g, "") === "9998";
+      if (isServerConfigured() && isProblematic9998) {
+        if (requestId && requestIndex < 0) throw new Error("No se encontró el identificador del alta seleccionada.");
+        await updateConsultorioSuspensionServer({ recordId: suspensionTarget.id, matricula: String(suspensionTarget.matricula || "9998"), consultorioSolicitudId: requestId || undefined, requestIndex: requestIndex >= 0 ? requestIndex : undefined, message: suspensionDraft.trim(), active: true });
+      } else {
+        await persistSuspensionForm({ ...sourceForm, suspensionAlta: { message: suspensionDraft.trim(), createdAt: new Date().toISOString(), active: true } });
+      }
+      setSuspensionTarget(null);
+      setSuspensionDraft("");
+      setSuspensionReadOnly(false);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "No se pudo guardar la suspensión.");
+    } finally {
+      setSavingSuspension(false);
+    }
+  };
+  const cancelSuspension = async () => {
+    if (!suspensionTarget) return;
+    setSavingSuspension(true);
+    try {
+      const { sourceForm } = await getSuspensionForm();
+      const requestId = suspensionTarget.consultorioSolicitudId || String((suspensionTarget.consultorioSolicitudes || []).find((request) => request.formularioHabilitacionConsultorio?.consultorioSolicitudId)?.formularioHabilitacionConsultorio?.consultorioSolicitudId || "").trim();
+      const requestIndex = requestId ? (suspensionTarget.consultorioSolicitudes || []).findIndex((request) => request.id === requestId || String(request.formularioHabilitacionConsultorio?.consultorioSolicitudId || "").trim() === requestId) : -1;
+      const isProblematic9998 = String(suspensionTarget.matricula || "").replace(/\D+/g, "") === "9998";
+      if (isServerConfigured() && isProblematic9998) {
+        if (requestId && requestIndex < 0) throw new Error("No se encontró el identificador del alta seleccionada.");
+        await updateConsultorioSuspensionServer({ recordId: suspensionTarget.id, matricula: String(suspensionTarget.matricula || "9998"), consultorioSolicitudId: requestId || undefined, requestIndex: requestIndex >= 0 ? requestIndex : undefined, message: String(sourceForm.suspensionAlta?.message || ""), active: false });
+      } else {
+        const { suspensionAlta: _removedSuspension, ...formWithoutSuspension } = sourceForm;
+        await persistSuspensionForm(formWithoutSuspension);
+      }
+      setSuspensionTarget(null);
+      setSuspensionDraft("");
+      setSuspensionReadOnly(false);
+    } finally {
+      setSavingSuspension(false);
+    }
+  };  const hasActiveAlta = (item: DeclarationData) => {
     const form = item.formularioHabilitacionConsultorio || {};
     const isApproved = form.estadoAdmin === "APROBADO" || form.validadoAdmin === true;
     const hasVigenciaDates = Boolean(form.certificadoVigenciaDesde || form.certificadoVigenciaHasta || form.validadoAt);
@@ -655,7 +726,7 @@ export default function ConsultorioRequestsPanel({
       setMessage(String(form.mensajeAdmin || form.descripcionCertificado || ""));
       setCertificateFrom(String(form.certificadoVigenciaDesde || new Date().toISOString().slice(0, 10)));
       setCertificateTo(String(form.certificadoVigenciaHasta || ""));
-      window.setTimeout(() => document.querySelector<HTMLElement>(".cokifimi-consultorio-preview-toolbar")?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+
     } finally {
       setOpeningRequestId(null);
     }
@@ -1109,7 +1180,7 @@ export default function ConsultorioRequestsPanel({
       <div ref={requestsListRef} className="cokifimi-consultorio-requests-list">
         {requests.map((item) => {
           const form = item.formularioHabilitacionConsultorio || {};
-          const rejected = form.estadoAdmin === "RECHAZADO";
+          const suspension = form.suspensionAlta && typeof form.suspensionAlta === "object" && (form.suspensionAlta as Record<string, unknown>).active === true ? form.suspensionAlta as Record<string, unknown> : null;  const rejected = form.estadoAdmin === "RECHAZADO";
           const approved =
             !rejected && (form.estadoAdmin === "APROBADO" || form.validadoAdmin === true);
           const awaitingPayment =
@@ -1122,7 +1193,7 @@ export default function ConsultorioRequestsPanel({
             : rejected
               ? "Rechazada"
               : "Pendiente de aprobación";
-          const displayStatus = rejected
+          const displayStatus = suspension ? "Alta suspendida" : rejected
             ? "Solicitud rechazada"
             : form.estadoPago === "COMPROBANTE_RECIBIDO"
               ? "Pendiente de aprobar pago y dar el alta"
@@ -1133,7 +1204,7 @@ export default function ConsultorioRequestsPanel({
             form.mensajeAdmin || form.descripcionCertificado || "",
           ).trim();
           const hasPreviousRejection = (Boolean(form.reenvioAt) || (Array.isArray(form.historialSolicitud) && form.historialSolicitud.some((entry) => String((entry as Record<string, unknown>)?.estadoAdmin || "") === "RECHAZADO")));
-          const attachedProfessionals = Array.from({ length: 8 }, (_, index) => index + 1).map((ordinal) => {
+          const attachedProfessionals = Array.from({ length: 13 }, (_, index) => index + 1).map((ordinal) => {
             const suffix = ordinal > 1 ? String(ordinal) : "";
             const matricula = form[`adjuntoMatricula${suffix}`];
             if (!matricula) return null;
@@ -1247,7 +1318,7 @@ export default function ConsultorioRequestsPanel({
                 <div className="cokifimi-request-bottom-summary">
                   <div className="cokifimi-request-status-cell">
                     <small>Estado de la solicitud</small>
-                    <em className={approved ? "is-approved" : rejected ? "is-rejected" : ""}>
+                    <em className={suspension ? "is-suspended" : approved ? "is-approved" : rejected ? "is-rejected" : ""}>
                       {displayStatus}
                     </em>
                   </div>
@@ -1255,6 +1326,7 @@ export default function ConsultorioRequestsPanel({
                 </div>
                 <div className="cokifimi-request-history-slot">
                 <button type="button" className="is-history" onClick={() => setHistoryItem(item)}><History /> Historial</button>
+                <button type="button" className={"is-suspend" + (suspension ? " is-active" : "")} onClick={() => { setSuspensionTarget(item); setSuspensionDraft(String(suspension?.message || "")); setSuspensionReadOnly(Boolean(suspension)); }}><Ban /> {suspension ? "Suspensión activa · Ver motivo" : "Suspender alta"}</button>
                 </div>
               </div>
               <div className="cokifimi-consultorio-request-actions">
@@ -1294,7 +1366,19 @@ export default function ConsultorioRequestsPanel({
         const label = (form: Record<string, unknown>) => form.estadoAdmin === "RECHAZADO" ? "Solicitud rechazada" : form.validadoAdmin === true || form.estadoAdmin === "APROBADO" ? "Solicitud aprobada" : form.estadoImporte === "IMPORTE_CONFIRMADO" ? "Esperando pago" : "Pendiente de revisión";
         const date = (value: unknown) => value ? new Date(String(value)).toLocaleDateString("es-AR") : "Sin informar";
         return <div className="cokifimi-member-history-modal" role="dialog" aria-modal="true" aria-labelledby="admin-history-title" onMouseDown={(event) => { if (event.currentTarget === event.target) setHistoryItem(null); }}><div className="cokifimi-member-history-card"><header><div className="cokifimi-member-history-heading"><History /><div><h2 id="admin-history-title">Historial de la solicitud</h2><p className="cokifimi-member-history-person"><UserRound /> {historyItem.apellido}, {historyItem.nombres}</p></div></div><button type="button" aria-label="Cerrar historial" onClick={() => setHistoryItem(null)}><X /></button></header><div className="cokifimi-member-history-meta"><div><BadgeCheck /><span>Matrícula</span><b>{historyItem.matricula || "Sin informar"}</b></div><div><MapPin /><span>Ciudad del consultorio</span><b>{String(current.localidadConsultorio || "Sin informar")}</b></div></div><div className="cokifimi-member-history-list">{isResubmittedAfterRejection && <div className="cokifimi-member-history-resubmission-banner"><strong>Solicitud reenviada por rechazo anterior</strong><span>El historial conserva el motivo informado en el rechazo previo.</span></div>}{entries.map((entry, index) => { const form = (entry || {}) as Record<string, unknown>; return <article key={`${String(form.submittedAt || index)}-${index}`} className={`cokifimi-member-history-item ${label(form) === "Solicitud rechazada" ? "is-rejected" : ""}`}><strong>{index === entries.length - 1 ? "Estado actual" : `Solicitud ${index + 1}`}</strong><div><CalendarDays /><span>Fecha solicitada</span><b>{date(form.submittedAt)}</b></div><div><CalendarDays /><span>Fecha inicio</span><b>{date(form.certificadoVigenciaDesde)}</b></div><div><CalendarDays /><span>Fecha fin</span><b>{date(form.certificadoVigenciaHasta)}</b></div><div><CircleDollarSign /><span>Monto</span><b>{form.importeConfirmado ? `$ ${Number(form.importeConfirmado).toLocaleString("es-AR")}` : "Sin informar"}</b></div><div><Activity /><span>Estado</span><b>{label(form)}</b></div><div className="cokifimi-member-history-resolution"><Clock3 /><span>{label(form) === "Solicitud aprobada" ? "Fecha y hora de aprobación" : label(form) === "Solicitud rechazada" ? "Fecha y hora de rechazo" : "Fecha y hora de actualización"}</span><b>{form.validadoAt || form.rechazadoAt || form.resueltoAt ? new Date(String(form.validadoAt || form.rechazadoAt || form.resueltoAt)).toLocaleString("es-AR") : "Sin informar"}</b></div><div className="cokifimi-member-history-message"><MessageSquareText /><span>Mensaje</span><b>{String(form.mensajeAdmin || form.descripcionCertificado || "Sin mensaje informado")}</b></div></article>; })}</div></div></div>;
-      })(), document.body)}      {updatedModal}
+      })(), document.body)}
+      {suspensionTarget && createPortal(
+        <div className="cokifimi-suspension-modal" role="dialog" aria-modal="true" aria-labelledby="suspension-alta-title" onMouseDown={(event) => { if (event.currentTarget === event.target && !savingSuspension) setSuspensionTarget(null); }}>
+          <div className="cokifimi-suspension-dialog">
+            <header><div><span>{suspensionReadOnly ? "SUSPENSIÓN ACTIVA" : "SUSPENSIÓN DE ALTA"}</span><h2 id="suspension-alta-title">{suspensionReadOnly ? "Alta de consultorio suspendida" : "Suspender alta de consultorio"}</h2></div><button type="button" aria-label="Cerrar" disabled={savingSuspension} onClick={() => setSuspensionTarget(null)}><X /></button></header>
+            <p className="cokifimi-suspension-recipient">{suspensionTarget.apellido}, {suspensionTarget.nombres}</p>
+            <p className="cokifimi-suspension-help">{suspensionReadOnly ? "Motivo informado al colegiado:" : "Escriba el motivo que verá el colegiado en su panel."}</p>
+            <textarea value={suspensionDraft} onChange={(event) => setSuspensionDraft(event.target.value)} placeholder="Ej.: Debe actualizar la documentación del consultorio." rows={6} maxLength={1000} readOnly={suspensionReadOnly} autoFocus />
+            <div className="cokifimi-suspension-counter">{suspensionDraft.length}/1000</div>
+            <div className="cokifimi-suspension-actions"><button type="button" disabled={savingSuspension} onClick={() => { setSuspensionTarget(null); setSuspensionReadOnly(false); }}>{suspensionReadOnly ? "Cerrar" : "Cancelar"}</button>{suspensionReadOnly ? <button type="button" className="is-danger" disabled={savingSuspension} onClick={() => void cancelSuspension()}><Ban /> {savingSuspension ? "Guardando..." : "Cancelar suspensión"}</button> : <button type="button" className="is-danger" disabled={savingSuspension || !suspensionDraft.trim()} onClick={() => void suspendAlta()}><Ban /> {savingSuspension ? "Guardando..." : "Confirmar suspensión"}</button>}</div>
+          </div>
+        </div>, document.body
+      )}      {updatedModal}
       {showCreateAltaModal && (
         <div className="cokifimi-consultorio-delete-modal" role="dialog" aria-modal="true" aria-labelledby="create-consultorio-title">
           <div className="cokifimi-consultorio-delete-dialog cokifimi-consultorio-create-alta-dialog">
