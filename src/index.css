@@ -8641,5 +8641,9 @@ html body > .cokifimi-excel-export-modal { align-items: center !important; backg
 .cokifimi-consultorio-form .cokifimi-consultorio-wizard-header { border-radius: 16px 16px 0 0; }
 .cokifimi-consultorio-form:has(.cokifimi-limited-edit-location) { padding-top: 14px; }
 .cokifimi-consultorio-form:has(.cokifimi-limited-edit-location) .cokifimi-consultorio-wizard-header { border-radius: 15px; margin: 0 14px; }
+.cokifimi-member-actions button.is-consultorio-updated { background: #15803d !important; border-color: #15803d !important; box-shadow: 0 8px 16px rgb(21 128 61 / .24) !important; }
+.cokifimi-member-actions button.is-consultorio-updated:hover { background: #166534 !important; }
 @media (max-width: 640px) { .cokifimi-consultorio-form:has(.cokifimi-limited-edit-location) { padding-top: 10px; } .cokifimi-consultorio-form:has(.cokifimi-limited-edit-location) .cokifimi-consultorio-wizard-header { margin: 0 10px; } }
 @media (max-width: 640px) { .cokifimi-limited-documents-title { align-items: flex-start; flex-direction: column; gap: 4px; } .cokifimi-limited-documents-grid { grid-template-columns: 1fr; } }
+.cokifimi-consultorio-actions button.is-saving svg { animation: cokifimi-consultorio-save-spin .85s linear infinite; }
+@keyframes cokifimi-consultorio-save-spin { to { transform: rotate(360deg); } }

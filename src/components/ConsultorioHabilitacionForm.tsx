@@ -14,6 +14,7 @@ import {
   Eye,
   FileText,
   FileUp,
+  LoaderCircle,
   MapPin,
   Save,
   Send,
@@ -161,32 +162,6 @@ export default function ConsultorioHabilitacionForm({
     usedConsultorioAddressKeys.has(
       consultorioAddressKey(consultorio.domicilio, consultorio.numeracion, consultorio.ciudad),
     );
-  const inheritedDocument = (key: string): string => {
-    const visited = new Set<object>();
-    const find = (value: unknown): string => {
-      if (!value || typeof value !== 'object' || visited.has(value as object)) return '';
-      visited.add(value as object);
-      if (Array.isArray(value)) {
-        for (const item of value) { const found = find(item); if (found) return found; }
-        return '';
-      }
-      const source = value as Record<string, unknown>;
-      for (const candidate of [key, `${key}Url`, `${key}Base64`]) {
-        const item = source[candidate];
-        if (typeof item === 'string' && item.trim()) return item.trim();
-        if (typeof item === 'number' && item > 0) return String(item);
-        if (item && typeof item === 'object') {
-          for (const nested of ['url', 'downloadUrl', 'src', 'file', 'data', 'base64']) {
-            const file = (item as Record<string, unknown>)[nested];
-            if (typeof file === 'string' && /^(data:|https?:\/\/|blob:)/i.test(file.trim())) return file.trim();
-          }
-        }
-      }
-      for (const child of Object.values(source)) { const found = find(child); if (found) return found; }
-      return '';
-    };
-    return find(record);
-  };
   const preserveCurrentConsultorio = Boolean(currentRequest) || previous.estadoAdmin === "RECHAZADO" || Boolean(adminEdit && previous.domicilioConsultorio);
   const currentAltaAddressKey = preserveCurrentConsultorio
     ? consultorioAddressKey(previous.domicilioConsultorio, previous.numeroConsultorio, previous.localidadConsultorio)
@@ -257,7 +232,7 @@ export default function ConsultorioHabilitacionForm({
     polizaPraxisArchivoNombre: record.polizaPraxisArchivoNombre || previous.polizaPraxisArchivoNombre || "",
     planoMunicipalArchivo: String(previous.planoMunicipalArchivo || ""),
     planoMunicipalArchivoNombre: String(previous.planoMunicipalArchivoNombre || ""),
-    certificadoBomberosArchivo: inheritedDocument("certificadoBomberosArchivo"),
+    certificadoBomberosArchivo: String(previous.certificadoBomberosArchivo || ""),
     certificadoBomberosArchivoNombre: String(previous.certificadoBomberosArchivoNombre || (record as DeclarationData & Record<string, unknown>).certificadoBomberosArchivoNombre || ""),
     declaraVeracidad: adminEdit ? false : Boolean(previous.declaraVeracidad),
     ciudadDeclaracion: record.municipioLocalidad || "",
@@ -1420,12 +1395,13 @@ export default function ConsultorioHabilitacionForm({
     const replaceDocument = (key: "planoMunicipalArchivo" | "certificadoBomberosArchivo", label: string) => {
       const loaded = Boolean(data[key]);
       const name = String(data[`${key}Nombre`] || "");
+      const pendingReplacement = typeof data[key] === "string" && data[key].startsWith("data:");
       const format = key === "planoMunicipalArchivo" ? "PDF obligatorio" : "PDF, JPG o PNG";
       return <article key={key} className={`cokifimi-limited-document-card ${loaded ? "is-loaded" : ""}`}>
         <div className="cokifimi-limited-document-card-heading"><FileText aria-hidden="true" /><div><strong>{label}</strong><span>{format}</span></div></div>
-        <p className="cokifimi-limited-document-status">{uploadingDocument ? "Procesando el archivo seleccionado…" : loaded ? `Archivo actual: ${name || "cargado"}` : "Todavía no hay un archivo cargado."}</p>
-        <label className="cokifimi-limited-document-upload"><FileUp aria-hidden="true" /> {loaded ? "Reemplazar archivo" : "Seleccionar archivo"}<input type="file" accept={key === "planoMunicipalArchivo" ? ".pdf,application/pdf" : ".pdf,.jpg,.jpeg,.png"} onChange={(event) => uploadDocument(key, event.target.files?.[0])} /></label>
-        <small>{loaded ? "El archivo actual se conservará hasta que guarde el reemplazo." : "Puede cargarlo ahora o hacerlo más adelante."}</small>
+        <p className="cokifimi-limited-document-status">{uploadingDocument ? "Procesando el archivo seleccionado…" : pendingReplacement ? `Nuevo archivo seleccionado: ${name || "cargado"}` : loaded ? `Archivo actual: ${name || "cargado"}` : "Todavía no hay un archivo cargado."}</p>
+        <label className="cokifimi-limited-document-upload"><FileUp aria-hidden="true" /> {loaded ? "Reemplazar archivo" : "Seleccionar archivo"}<input type="file" accept={key === "planoMunicipalArchivo" ? ".pdf,application/pdf" : ".pdf,.jpg,.jpeg,.png"} onChange={(event) => { uploadDocument(key, event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
+        <small>{pendingReplacement ? "Se reemplazará cuando guarde los cambios." : loaded ? "El archivo actual se conservará hasta que guarde el reemplazo." : "Puede cargarlo ahora o hacerlo más adelante."}</small>
       </article>;
     };
     return (
@@ -1442,7 +1418,7 @@ export default function ConsultorioHabilitacionForm({
           {section("Instalaciones del consultorio", editableChecks.slice(0, 16).map((key) => select(CONSULTORIO_FIELD_LABELS[key] || key.replace(/([A-Z])/g, " $1"), key)))}
           {section("Sala de espera", editableChecks.slice(16).map((key) => select(CONSULTORIO_FIELD_LABELS[key] || key.replace(/([A-Z])/g, " $1"), key)))}
           <section className="cokifimi-limited-documents"><div className="cokifimi-limited-documents-title"><h2>Archivos adjuntos</h2><p>Reemplace un documento únicamente si tiene una versión nueva.</p></div><div className="cokifimi-limited-documents-grid">{replaceDocument("planoMunicipalArchivo", "Plano edilicio habilitado y aprobado por la Municipalidad")}{replaceDocument("certificadoBomberosArchivo", "Certificado de bomberos vigente")}</div></section>
-          <footer className="cokifimi-consultorio-actions"><button type="submit" disabled={saving || uploadingDocument}><Save /> {uploadingDocument ? "Procesando archivo…" : "Guardar cambios"}</button></footer>
+          <footer className="cokifimi-consultorio-actions"><button type="submit" className={saving ? "is-saving" : undefined} disabled={saving || uploadingDocument}>{saving ? <LoaderCircle aria-hidden="true" /> : <Save />} {uploadingDocument ? "Procesando archivo…" : saving ? "Guardando y reemplazando archivo…" : "Guardar cambios"}</button></footer>
         </form>
       </section>
     );

@@ -299,9 +299,16 @@ export default function MemberPortal({
   const [message, setMessage] = useState("");
   const [showUpdatedModal, setShowUpdatedModal] = useState(false);
   const [updatedModalMode, setUpdatedModalMode] = useState<"updated" | "libre-deuda">("updated");
+  const [consultorioUpdatedRequest, setConsultorioUpdatedRequest] = useState<string | null>(null);
   const [consultorioHistoryForm, setConsultorioHistoryForm] = useState<Record<string, unknown> | null>(null);
   const [pendingPaymentFile, setPendingPaymentFile] = useState<{ url: string; name: string } | null>(null);
   const [paymentSending, setPaymentSending] = useState(false);
+
+  useEffect(() => {
+    if (!consultorioUpdatedRequest) return;
+    const timer = window.setTimeout(() => setConsultorioUpdatedRequest(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [consultorioUpdatedRequest]);
   const [paymentSent, setPaymentSent] = useState(false);
   const [paymentNotice, setPaymentNotice] = useState<"sending" | "sent" | null>(null);
   const [pendingPaymentFilesByRequest, setPendingPaymentFilesByRequest] = useState<Record<string, { url: string; name: string } | null>>({});
@@ -649,20 +656,43 @@ export default function MemberPortal({
   const saveInFlightRef = useRef(false);
   const saveLimitedConsultorioUpdate = async (updates: Record<string, unknown>) => {
     if (!record || saveInFlightRef.current) return;
+    const updatedRequestId = record.consultorioSolicitudId || "principal";
+    const previousConsultorioForm = record.consultorioSolicitudId
+      ? record.consultorioSolicitudes?.find((request) => request.id === record.consultorioSolicitudId)?.formularioHabilitacionConsultorio
+      : record.formularioHabilitacionConsultorio;
+    const replacementKeys = ["planoMunicipalArchivo", "certificadoBomberosArchivo"] as const;
+    const requestedReplacementKeys = replacementKeys.filter((key) => typeof updates[key] === "string" && updates[key].startsWith("data:"));
+    const hasChanges = Object.entries(updates).some(([key, value]) =>
+      (typeof value === "string" && value.startsWith("data:")) || value !== previousConsultorioForm?.[key],
+    );
     saveInFlightRef.current = true;
     setError("");
     setLoading(true);
     try {
       const saved = await memberUpdateConsultorioLimited(record.consultorioSolicitudId, updates);
-      if (!(saved as DeclarationData & { _limitedConsultorioUpdated?: boolean })._limitedConsultorioUpdated) {
+      const savedResponse = saved as DeclarationData & { _limitedConsultorioUpdated?: boolean; _limitedConsultorioReplacements?: Record<string, string> };
+      if (!savedResponse._limitedConsultorioUpdated) {
         throw new Error("El servidor no confirmó el reemplazo del adjunto. Debe actualizarse el archivo PHP del plugin antes de volver a intentar.");
       }
       try { localStorage.removeItem(`cokifimi_consultorio_adjuntos_${record.id}`); } catch { /* caché opcional */ }
-      // El servidor es la fuente de verdad: releer evita conservar en pantalla
-      // una URL heredada del archivo anterior después de reemplazarlo.
-      const refreshed = await memberMe().catch(() => saved);
-      const refreshedRecord = "record" in refreshed ? refreshed.record : refreshed;
-      setRecord(normalizeRecord((refreshedRecord || saved) as DeclarationData));
+      // La respuesta contiene la URL que ya quedó persistida en la base. No se
+      // hace una segunda petición: en algunos servidores esa recarga queda
+      // bloqueada mientras finaliza la subida del archivo.
+      const confirmedReplacementUrls = savedResponse._limitedConsultorioReplacements || {};
+      if (requestedReplacementKeys.some((key) => !confirmedReplacementUrls[key])) {
+        throw new Error("El servidor no confirmó el reemplazo del archivo seleccionado.");
+      }
+      const confirmedUpdates = { ...updates, ...confirmedReplacementUrls };
+      const confirmedRecord = normalizeRecord(record.consultorioSolicitudId
+        ? {
+            ...record,
+            consultorioSolicitudes: record.consultorioSolicitudes?.map((request) => request.id === record.consultorioSolicitudId
+              ? { ...request, formularioHabilitacionConsultorio: { ...request.formularioHabilitacionConsultorio, ...confirmedUpdates } }
+              : request),
+          }
+        : { ...record, formularioHabilitacionConsultorio: { ...record.formularioHabilitacionConsultorio, ...confirmedUpdates } });
+      setRecord(confirmedRecord);
+      setConsultorioUpdatedRequest(hasChanges ? updatedRequestId : null);
       setLimitedConsultorioEdit(false);
       setScreen("dashboard");
       setMessage("Información del consultorio actualizada correctamente.");
@@ -2352,9 +2382,10 @@ const consultorioRequestedLocation = [
                   </button>
                   <button
                     type="button"
+                    className={consultorioUpdatedRequest === "principal" ? "is-consultorio-updated" : undefined}
                     onClick={() => { setRecord({ ...record!, consultorioSolicitudId: undefined }); setLimitedConsultorioEdit(true); setScreen("consultorio"); }}
                   >
-                    <FilePenLine /> EDITAR MI CONSULTORIO
+                    {consultorioUpdatedRequest === "principal" ? <><CheckCircle2 /> MODIFICADO CORRECTAMENTE</> : <><FilePenLine /> EDITAR MI CONSULTORIO</>}
                   </button>
                 </div>
                 <div
@@ -2553,7 +2584,7 @@ const consultorioRequestedLocation = [
                       <div><CalendarDays /><span>Vencimiento</span><strong>{formatDateOnly(validityTo)}</strong></div>
                       <div className="is-highlight"><CalendarDays /><span>Vigencia</span><strong>{validityDays !== null && validityDays < 0 ? "Vencida" : `${validityDays} días restantes`}</strong></div>
                     </div>
-                  <div className="cokifimi-member-actions"><button type="button" onClick={() => { setRecord({ ...record!, consultorioSolicitudId: request.id, formularioHabilitacionConsultorio: { ...form, consultorioSolicitudId: request.id } }); setScreen("consultorio-view"); }}><CalendarDays /> VER MI HABILITACIÓN DE CONSULTORIO</button><button type="button" onClick={() => { setRecord({ ...record!, consultorioSolicitudId: request.id, formularioHabilitacionConsultorio: { ...form, consultorioSolicitudId: request.id } }); setLimitedConsultorioEdit(true); setScreen("consultorio"); }}><FilePenLine /> EDITAR MI CONSULTORIO</button></div>
+                  <div className="cokifimi-member-actions"><button type="button" onClick={() => { setRecord({ ...record!, consultorioSolicitudId: request.id, formularioHabilitacionConsultorio: { ...form, consultorioSolicitudId: request.id } }); setScreen("consultorio-view"); }}><CalendarDays /> VER MI HABILITACIÓN DE CONSULTORIO</button><button type="button" className={consultorioUpdatedRequest === request.id ? "is-consultorio-updated" : undefined} onClick={() => { setRecord({ ...record!, consultorioSolicitudId: request.id, formularioHabilitacionConsultorio: { ...form, consultorioSolicitudId: request.id } }); setLimitedConsultorioEdit(true); setScreen("consultorio"); }}>{consultorioUpdatedRequest === request.id ? <><CheckCircle2 /> MODIFICADO CORRECTAMENTE</> : <><FilePenLine /> EDITAR MI CONSULTORIO</>}</button></div>
                     <div className="cokifimi-member-consultorio-validation is-validated">
                       <CheckCircle2 />
                       <div>

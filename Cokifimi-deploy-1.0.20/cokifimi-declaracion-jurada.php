@@ -2,7 +2,7 @@
 /**
  * Plugin Name: COKIFIMI Declaracion Jurada-token
  * Description: Formulario React para la declaracion jurada digital de matricula.
- * Version: 1.0.91
+ * Version: 1.0.92
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: Joni-Ayala Edicion: *-CodigoTech-*
@@ -775,7 +775,7 @@ function cokifimi_dj_store_consultorio_attachment($record_id, $key, $value) {
         $attachment_suffix = !empty($suffix_match[1]) ? '-adjunto-2' : '-adjunto-1';
         $key = preg_replace('/Adjunto2?$/', '', (string) $key);
     }
-    if (!is_string($value) || !preg_match('/^data:([a-zA-Z0-9.+-]+);base64,(.+)$/s', $value, $matches)) return null;
+    if (!is_string($value) || strpos($value, 'data:') !== 0) return null;
     $allowed = array(
         'certificadoAnssalArchivo' => 'certificado-anssal',
         'polizaPraxisArchivo' => 'poliza-praxis',
@@ -790,6 +790,8 @@ function cokifimi_dj_store_consultorio_attachment($record_id, $key, $value) {
         'comprobantePagoUrl' => 'comprobante-libre-deuda-admin',
     );
     if (!isset($allowed[$key])) return null;
+    // Usar el validador único de adjuntos: acepta parámetros válidos del MIME
+    // que FileReader puede incluir antes de ;base64.
     $stored = cokifimi_dj_store_data_url_attachment($record_id, $allowed[$key] . $attachment_suffix, $value);
     if (is_wp_error($stored)) return $stored;
     return array('url' => $stored['url'], 'name' => $stored['name'], 'mime' => $stored['mime'], 'id' => $stored['id']);
@@ -1038,7 +1040,8 @@ function cokifimi_dj_member_limited_consultorio_update(WP_REST_Request $request)
     $request_id = sanitize_key($payload['consultorioSolicitudId'] ?? '');
     $allowed_checks = array('puertasIngresoAdaptadas', 'puertasInternasAdaptadas', 'rampas', 'escaleras', 'escalerasPasamanos', 'ascensor', 'instalacionElectrica', 'descargaTierra', 'sistemaTrifasico', 'disyuntor', 'alarmaHumo', 'salidaEmergencia', 'aireConsultorio', 'ventilacionPasivaConsultorio', 'ventilacionForzadaConsultorio', 'boxes', 'aireEspera', 'ventilacionPasivaEspera', 'ventilacionForzadaEspera', 'bano', 'inodoro', 'lavatorio', 'aguaCaliente', 'ducha', 'banoAdaptado', 'gimnasioTerapeutico', 'gimnasioDeportivo');
     $allowed_documents = array('planoMunicipalArchivo', 'certificadoBomberosArchivo');
-    $apply_updates = function ($form) use ($updates, $allowed_checks, $allowed_documents, $row) {
+    $replaced_documents = array();
+    $apply_updates = function ($form) use ($updates, $allowed_checks, $allowed_documents, $row, &$replaced_documents) {
         $form = is_array($form) ? $form : array();
         foreach ($allowed_checks as $key) {
             if (!array_key_exists($key, $updates)) continue;
@@ -1050,13 +1053,26 @@ function cokifimi_dj_member_limited_consultorio_update(WP_REST_Request $request)
             $attachment = cokifimi_dj_store_consultorio_attachment($row->record_id, $key, $updates[$key]);
             if (is_wp_error($attachment)) return $attachment;
             if ($attachment) {
+                // La nueva versión es la única referencia válida del documento.
+                // Algunos registros previos conservan aliases de la URL anterior.
+                $legacy_document_urls = array(
+                    'planoMunicipalArchivo' => 'planoMunicipalUrl',
+                    'certificadoBomberosArchivo' => 'certificadoBomberosUrl',
+                );
+                if (isset($legacy_document_urls[$key])) {
+                    unset($form[$legacy_document_urls[$key]]);
+                }
+                unset(
+                    $form[$key . 'Url'],
+                    $form[$key . 'Base64'],
+                    $form[$key . 'Data'],
+                    $form[$key . 'OriginalUrl']
+                );
                 $form[$key] = $attachment['url'];
-                $form[$key . 'Nombre'] = $attachment['name'];
+                $form[$key . 'Nombre'] = !empty($updates[$key . 'Nombre']) ? sanitize_file_name($updates[$key . 'Nombre']) : $attachment['name'];
                 $form[$key . 'Mime'] = $attachment['mime'];
                 $form[$key . 'Id'] = $attachment['id'];
-                // Evita que una referencia heredada a la versión anterior se
-                // priorice al volver a abrir el formulario.
-                unset($form[preg_replace('/Archivo$/', 'Url', $key)]);
+                $replaced_documents[$key] = $attachment['url'];
             }
         }
         return $form;
@@ -1079,11 +1095,14 @@ function cokifimi_dj_member_limited_consultorio_update(WP_REST_Request $request)
     }
     $record['updatedAt'] = current_time('mysql', true);
     $updated = $wpdb->update(cokifimi_dj_table_name(), array('payload' => wp_json_encode($record), 'updated_at' => $record['updatedAt']), array('record_id' => $row->record_id), array('%s', '%s'), array('%s'));
+    if (!empty($replaced_documents) && $updated !== 1) return new WP_Error('consultorio_not_saved', 'No se pudo confirmar el reemplazo del archivo.', array('status' => 500));
     if ($updated === false) return new WP_Error('consultorio_not_saved', 'No se pudo guardar la actualización.', array('status' => 500));
-    // Señal de confirmación para el portal: evita informar éxito si el sitio
-    // todavía ejecuta una versión anterior del plugin.
-    $record['_limitedConsultorioUpdated'] = true;
-    return rest_ensure_response($record);
+    // Devolver sólo la confirmación ya persistida. Serializar el registro
+    // completo tras una subida grande puede demorar la respuesta innecesariamente.
+    return rest_ensure_response(array(
+        '_limitedConsultorioUpdated' => true,
+        '_limitedConsultorioReplacements' => $replaced_documents,
+    ));
 }
 
 
